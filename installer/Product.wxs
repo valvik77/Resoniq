@@ -1,0 +1,41 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="$(var.ProductName)" Manufacturer="RESONIQ" Version="0.2.0" UpgradeCode="B95F9C89-4D5B-4D1B-899B-65872A579D83" Scope="perMachine" Language="1034">
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="Ya hay una version mas reciente de RESONIQ instalada." />
+    <MediaTemplate EmbedCab="yes" />
+    <Property Id="DpsSigningMode" Value="$(var.SigningMode)" />
+    <Launch Condition="VersionNT64 AND Msix64 AND MsiNTProductType=1 AND WINDOWSBUILD &gt;= 22621" Message="RESONIQ y su dispositivo DSP requieren Windows 11 22H2 o posterior, x64." />
+    <Property Id="WINDOWSBUILD"><RegistrySearch Id="Build" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentBuildNumber" Type="raw" Bitness="always64" /></Property>
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <ui:WixUI Id="WixUI_FeatureTree" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.Payload)/license.rtf" />
+    <StandardDirectory Id="ProgramFiles64Folder"><Directory Id="INSTALLFOLDER" Name="RESONIQ" /></StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder"><Directory Id="ProgramMenuDir" Name="RESONIQ" /></StandardDirectory>
+    <Feature Id="Application" Title="Aplicacion RESONIQ" Description="Aplicacion, perfiles y herramientas para crear o retirar el dispositivo DSP." Level="1" AllowAbsent="no">
+      <ComponentGroupRef Id="PayloadFiles" />
+      <ComponentRef Id="StartMenu" />
+    </Feature>
+    <Feature Id="VirtualDevice" Title="Crear dispositivo virtual DSP" Description="$(var.DriverDescription)" Level="$(var.DriverLevel)">
+      <ComponentRef Id="DeviceFeatureMarker" />
+    </Feature>
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="DeviceFeatureMarker" Guid="3E80CF7A-7072-4A72-A81B-D5C06F479648" Bitness="always64"><RegistryValue Root="HKLM" Key="Software\RESONIQ" Name="VirtualDeviceSelected" Type="integer" Value="1" KeyPath="yes" /></Component>
+    </DirectoryRef>
+    <DirectoryRef Id="ProgramMenuDir">
+      <Component Id="StartMenu" Guid="BBE7C7C5-F422-4E7C-8D51-9C40A02D070D" Bitness="always64">
+        <Shortcut Id="Launch" Name="RESONIQ" Target="[INSTALLFOLDER]resoniq.exe" WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="CreateDevice" Name="Crear dispositivo virtual DSP" Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe" Arguments='-NoProfile -ExecutionPolicy Bypass -File "[INSTALLFOLDER]driver\Manage-Device.ps1" -Install' WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="RemoveDevice" Name="Retirar dispositivo virtual DSP" Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe" Arguments='-NoProfile -ExecutionPolicy Bypass -File "[INSTALLFOLDER]driver\Manage-Device.ps1" -Remove' WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveStartMenu" On="uninstall" />
+        <RegistryValue Root="HKLM" Key="Software\RESONIQ" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+    <CustomAction Id="InstallDevice" Directory="INSTALLFOLDER" ExeCommand='"[System64Folder]WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "[INSTALLFOLDER]driver\Manage-Device.ps1" -Install -NonInteractive' Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="RollbackDevice" Directory="INSTALLFOLDER" ExeCommand='"[System64Folder]WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "[INSTALLFOLDER]driver\Manage-Device.ps1" -Remove -OnlyIfOwned -Rollback -NonInteractive' Execute="rollback" Impersonate="no" Return="ignore" />
+    <CustomAction Id="RemoveDeviceOwned" Directory="INSTALLFOLDER" ExeCommand='"[System64Folder]WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "[INSTALLFOLDER]driver\Manage-Device.ps1" -Remove -OnlyIfOwned -NonInteractive' Execute="deferred" Impersonate="no" Return="check" />
+    <InstallExecuteSequence>
+      <Custom Action="RemoveDeviceOwned" Before="RemoveFiles" Condition='REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE' />
+      <Custom Action="RollbackDevice" After="InstallFiles" Condition='DpsSigningMode="production" AND &amp;VirtualDevice=3 AND NOT REMOVE' />
+      <Custom Action="InstallDevice" After="RollbackDevice" Condition='DpsSigningMode="production" AND &amp;VirtualDevice=3 AND NOT REMOVE' />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

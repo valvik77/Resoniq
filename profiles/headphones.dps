@@ -1,0 +1,22 @@
+version 1
+name "Auriculares genericos"
+device "Headphones"
+preset "Natural"
+output_id ""
+raw 1
+enabled 1
+adaptive 1
+bass 0.150000006
+clarity 0.150000006
+dynamics 0.150000006
+spatial 0.0500000007
+intensity 1
+agc_attack_ms 100
+agc_release_ms 1500
+highpass_hz 20
+body_hz 150
+body_db 2
+presence_hz 2600
+presence_db 3
+harmonic_gain 0
+stereo_amount 0.150000006

@@ -1,0 +1,36 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="RESONIQ" Manufacturer="RESONIQ" Version="0.2.4" UpgradeCode="B95F9C89-4D5B-4D1B-899B-65872A579D83" Scope="perMachine" Language="1034">
+    <Icon Id="ResoniqIcon" SourceFile="$(var.Payload)/resoniq.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ResoniqIcon" />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="Ya hay una version mas reciente de RESONIQ instalada." />
+    <MediaTemplate EmbedCab="yes" />
+    <Launch Condition="VersionNT64 AND Msix64 AND MsiNTProductType=1 AND WINDOWSBUILD &gt;= 22621" Message="Esta version de RESONIQ requiere Windows 11 22H2 o posterior, x64." />
+    <Property Id="WINDOWSBUILD"><RegistrySearch Id="Build" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentBuildNumber" Type="raw" Bitness="always64" /></Property>
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Preparar la instalacion de VB-CABLE" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WixShellExecTarget" Value="[#CableLauncher]" />
+    <CustomAction Id="LaunchInstructions" BinaryRef="Wix4UtilCA_X64" DllEntry="WixShellExec" Impersonate="yes" Return="ignore" />
+    <UI><Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchInstructions" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX=1 AND NOT Installed" /></UI>
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.Payload)/license.rtf" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.Payload)/installer-banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.Payload)/installer-dialog.bmp" />
+    <StandardDirectory Id="ProgramFiles64Folder"><Directory Id="INSTALLFOLDER" Name="RESONIQ" /></StandardDirectory>
+    <!-- Pack45's panel and x64 driver both use this persistent DWORD.
+         Keep the vendor setting on uninstall: removing RESONIQ must not disable
+         Windows volume for other applications using an installed cable. -->
+    <Component Id="CableWindowsVolume" Directory="INSTALLFOLDER" Guid="*" Bitness="always64" Permanent="yes">
+      <RegistryValue Root="HKLM" Key="SOFTWARE\VB-Audio\Cable" Name="VBAudioCableWDM_VolCtl" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+    <StandardDirectory Id="ProgramMenuFolder"><Directory Id="ProgramMenuDir" Name="RESONIQ" /></StandardDirectory>
+    <Feature Id="Application" Title="RESONIQ" Level="1"><ComponentGroupRef Id="PayloadFiles" /><ComponentRef Id="CableStartMenu" /><ComponentRef Id="CableWindowsVolume" /></Feature>
+    <DirectoryRef Id="ProgramMenuDir"><Component Id="CableStartMenu" Guid="96E17884-B5E6-47BF-A4F6-00F5E60D2F11" Bitness="always64">
+      <Shortcut Id="Launch" Name="RESONIQ" Target="[INSTALLFOLDER]resoniq.exe" WorkingDirectory="INSTALLFOLDER" Icon="ResoniqIcon" IconIndex="0" />
+      <Shortcut Id="CableWebsite" Name="VB-CABLE - descarga oficial" Target="[INSTALLFOLDER]VB-CABLE.url" />
+      <Shortcut Id="CableInstaller" Name="Instalar VB-CABLE" Target="[INSTALLFOLDER]Install-VBCABLE.cmd" Icon="ResoniqIcon" IconIndex="0" />
+      <Shortcut Id="Instructions" Name="RESONIQ - instrucciones" Target="[INSTALLFOLDER]VB-CABLE.txt" />
+      <RemoveFolder Id="RemoveStartMenu" On="uninstall" />
+      <RegistryValue Root="HKLM" Key="Software\RESONIQ" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+    </Component></DirectoryRef>
+  </Package>
+</Wix>

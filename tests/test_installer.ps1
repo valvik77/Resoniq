@@ -1,0 +1,97 @@
+[CmdletBinding()]
+param([string]$MsiPath='dist/RESONIQ-Setup-0.2.0-x64-Development.msi',[switch]$Cable)
+$ErrorActionPreference='Stop'
+$taskRoot=Split-Path $PSScriptRoot -Parent
+$taskMsi=[IO.Path]::GetFullPath((Join-Path $taskRoot $MsiPath))
+$taskWork=Join-Path $taskRoot ('build/installer-test-'+[Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $taskWork | Out-Null
+$taskWix=Join-Path $taskRoot 'build/tools/wix/wix.exe'
+& $taskWix msi decompile $taskMsi -o (Join-Path $taskWork 'package.wxs') -x (Join-Path $taskWork 'extracted')
+if($LASTEXITCODE -ne 0){throw 'MSI extraction failed'}
+[xml]$taskXml=Get-Content -LiteralPath (Join-Path $taskWork 'package.wxs') -Raw
+$taskManager=[Xml.XmlNamespaceManager]::new($taskXml.NameTable);$taskManager.AddNamespace('w','http://wixtoolset.org/schemas/v4/wxs')
+if($Cable) {
+    $taskVolume=$taskXml.SelectSingleNode('//w:Component[@Id="CableWindowsVolume"]',$taskManager)
+    $taskValue=$taskVolume.SelectSingleNode('w:RegistryValue',$taskManager)
+    if($taskVolume.Bitness -ne 'always64' -or $taskVolume.Permanent -ne 'yes' -or $taskValue.Root -ne 'HKLM' -or $taskValue.Key -ne 'SOFTWARE\VB-Audio\Cable' -or $taskValue.Name -ne 'VBAudioCableWDM_VolCtl' -or $taskValue.Type -ne 'integer' -or $taskValue.Value -ne '1'){throw 'VB Windows volume configuration missing or invalid'}
+    if(-not $taskXml.SelectSingleNode('//w:Feature[@Id="Application"]/w:ComponentRef[@Id="CableWindowsVolume"]',$taskManager)){throw 'VB volume configuration is not installed'}
+    foreach($taskAction in $taskXml.SelectNodes('//w:CustomAction',$taskManager)) {
+        if($taskAction.Id -ne 'LaunchInstructions'){throw 'Cable MSI runs custom driver actions'}
+    }
+    if($taskXml.SelectSingleNode('//w:InstallExecuteSequence/w:Custom[@Action="LaunchInstructions"]',$taskManager)){throw 'Instructions run as an install transaction action'}
+    if(-not $taskXml.SelectSingleNode('//w:Property[@Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"]',$taskManager)){throw 'Installer offers no prerequisite instructions'}
+    foreach($taskShortcut in @('CableWebsite','CableInstaller','Instructions')) {
+        if(-not $taskXml.SelectSingleNode('//w:Shortcut[@Id="'+$taskShortcut+'"]',$taskManager)){throw 'Cable prerequisites shortcut missing'}
+    }
+} else {
+$taskFeature=$taskXml.SelectSingleNode('//w:Feature[@Id="VirtualDevice"]',$taskManager)
+if($taskFeature.Level -ne '0'){throw 'Development MSI exposes automatic driver installation'}
+$taskMode=$taskXml.SelectSingleNode('//w:Property[@Id="DpsSigningMode"]',$taskManager)
+$taskInstallSequence=$taskXml.SelectSingleNode('//w:InstallExecuteSequence/w:Custom[@Action="InstallDevice"]',$taskManager)
+if($taskMode.Value -ne 'development' -or $taskInstallSequence.Condition -notmatch 'DpsSigningMode="production"'){throw 'Development MSI can execute driver installation'}
+$taskInstall=$taskXml.SelectSingleNode('//w:CustomAction[@Id="InstallDevice"]',$taskManager)
+if($taskInstall.Execute -ne 'deferred' -or $taskInstall.Impersonate -ne 'no'){throw 'Driver action is not elevated/deferred'}
+$taskRemove=$taskXml.SelectSingleNode('//w:InstallExecuteSequence/w:Custom[@Action="RemoveDeviceOwned"]',$taskManager)
+if($taskRemove.Condition -notmatch 'NOT UPGRADINGPRODUCTCODE'){throw 'Upgrade removes the existing device'}
+$taskRollback=$taskXml.SelectSingleNode('//w:CustomAction[@Id="RollbackDevice"]',$taskManager)
+if($taskRollback.Execute -ne 'rollback' -or $taskRollback.ExeCommand -notmatch '-Rollback'){throw 'Driver rollback missing'}
+}
+$taskLaunch=$taskXml.SelectSingleNode('//w:Launch',$taskManager)
+if($taskLaunch.Condition -notmatch 'Msix64' -or $taskLaunch.Condition -notmatch '22621'){throw 'Architecture/OS checks missing'}
+$taskInstalled=Join-Path $taskWork 'application'
+New-Item -ItemType Directory -Path $taskInstalled | Out-Null
+$taskFiles=$taskXml.SelectNodes('//w:Directory[@Id="INSTALLFOLDER"]//w:File',$taskManager)
+$taskNames=@()
+foreach($taskFile in $taskFiles) {
+    $taskParts=@();$taskParent=$taskFile.ParentNode.ParentNode
+    while($taskParent.Id -ne 'INSTALLFOLDER') {
+        if($taskParent.LocalName -ne 'Directory'){throw 'Unexpected MSI file layout'}
+        $taskParts=@($taskParent.Name)+$taskParts;$taskParent=$taskParent.ParentNode
+    }
+    $taskRelative=(@($taskParts)+@($taskFile.Name)) -join '/'
+    $taskNames+=$taskRelative
+    if($taskRelative -match '(?i)\.pfx$|\.key$|\.wav$|\.user\.dps$|attack-body|intensity-aligned'){throw 'Private/experimental content in MSI'}
+    $taskTarget=Join-Path $taskInstalled $taskRelative
+    New-Item -ItemType Directory -Path (Split-Path $taskTarget -Parent) -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $taskWork ('extracted/File/'+$taskFile.Id)) -Destination $taskTarget
+}
+$taskRequired=if($Cable){@('resoniq.exe','resoniq.ico','installed.marker','VB-CABLE.url','VB-CABLE.txt','Prepare-VBCABLE.ps1','Install-VBCABLE.cmd')}else{@('resoniq.exe','resoniq_device.exe','installed.marker','driver/build/DpsAudioVirtual.sys','driver/build/DpsAudioVirtual.inf','driver/build/DpsAudioVirtual.cat','driver/build/MS-PL.txt')}
+foreach($taskName in $taskRequired) {
+    if($taskName -notin $taskNames){throw ('MSI missing: '+$taskName)}
+}
+if($Cable -and @($taskNames | Where-Object {$_ -match '(?i)\.sys$|\.cat$|\.cer$|Manage-Device|resoniq_device'}).Count){throw 'Cable MSI contains own driver components'}
+if($Cable) {
+    foreach($taskScript in @('Prepare-VBCABLE.ps1','Install-VBCABLE.cmd')) {
+        if((Get-FileHash (Join-Path $taskInstalled $taskScript)).Hash -ne (Get-FileHash (Join-Path $taskRoot ('installer/'+$taskScript))).Hash){throw 'Packaged assistant differs from tested source'}
+    }
+    $taskPrepared=& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File (Join-Path $taskInstalled 'Prepare-VBCABLE.ps1') -VerifyOnly -PackagePath (Join-Path $taskRoot 'build/vbcable-research/VBCABLE_Driver_Pack45.zip') -DataDirectory (Join-Path $taskWork 'prerequisite-test')
+    if($LASTEXITCODE -ne 0){throw 'Packaged assistant verification failed'}
+    $taskPrepared=$taskPrepared | ConvertFrom-Json
+    if(-not $taskPrepared.verified -or $taskPrepared.installed){throw 'Packaged assistant verification result invalid'}
+}
+if(-not $Cable) {
+$taskParserErrors=$null;$taskTokens=$null
+[void][Management.Automation.Language.Parser]::ParseFile((Join-Path $taskInstalled 'driver/Manage-Device.ps1'),[ref]$taskTokens,[ref]$taskParserErrors)
+if($taskParserErrors.Count){throw 'Invalid PowerShell in MSI'}
+& (Join-Path $taskInstalled 'driver/verify_package.ps1')
+}
+$taskHelper=if($Cable){Join-Path $taskRoot 'build/Release/resoniq_device.exe'}else{Join-Path $taskInstalled 'resoniq_device.exe'}
+$taskBefore=& $taskHelper --check
+if($LASTEXITCODE -ne 0){throw 'Device preflight failed'}
+$taskData=Join-Path $taskWork 'user-data'
+$taskProfile=Join-Path $taskRoot 'config/session.user.dps'
+foreach($taskMode in @('--self-test','--audio-test')) {
+    $taskProcess=Start-Process -FilePath (Join-Path $taskInstalled 'resoniq.exe') -ArgumentList @($taskMode,'--data-dir',('"'+$taskData+'"'),'--profile',('"'+$taskProfile+'"')) -WindowStyle Hidden -PassThru
+    if(-not $taskProcess.WaitForExit(20000)){throw ('Installed-layout timeout: '+$taskMode)}
+    if($taskProcess.ExitCode -ne 0){throw ('Installed-layout failure: '+$taskMode)}
+}
+if(Test-Path -LiteralPath (Join-Path $taskInstalled 'config')){throw 'Application writes configuration beside Program Files binaries'}
+if(-not (Test-Path -LiteralPath (Join-Path $taskData 'build/gui-audio-result.txt'))){throw 'User data redirection failed'}
+$taskAfter=& $taskHelper --check
+if($taskBefore -ne $taskAfter){throw 'Device preflight changed the system'}
+if(-not $Cable) {
+$taskProductionRejected=$false
+try {& (Join-Path $taskRoot 'installer/Build-Installer.ps1') -Production}catch {$taskProductionRejected=$true}
+if(-not $taskProductionRejected){throw 'Test-signed driver was accepted for production'}
+}
+Write-Output ('PASS: MSI payload, OS gate, prerequisites, driver isolation and installed layout GUI/WASAPI; Cable='+$Cable+'; evidence: '+$taskWork)

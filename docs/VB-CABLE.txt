@@ -1,0 +1,45 @@
+RESONIQ 0.2.4 - transporte VB-CABLE
+
+El MSI activa automaticamente Windows Volume Control de VB-CABLE en su
+configuracion persistente. Si VB-CABLE ya estaba instalado, reinicia Windows
+para que su controlador vuelva a leer el ajuste. No reinicia automaticamente.
+
+Desde Inicio -> RESONIQ -> Instalar VB-CABLE puedes abrir el asistente que
+descarga, verifica y extrae el paquete oficial automaticamente. Tambien se
+ofrece al terminar la instalacion de RESONIQ. Si Windows ya detecta el cable,
+no abre el instalador para evitar que lo retire por accidente.
+Solo quedan el permiso de administrador, Install Driver en el asistente de
+VB-Audio y el reinicio manual. No se cambian Secure Boot ni TESTSIGNING.
+Si prefieres la instalacion manual, sigue estos pasos:
+
+1. Descarga el cable basico desde https://vb-audio.com/Cable/
+2. Extrae el ZIP completo y ejecuta VBCABLE_Setup_x64.exe como administrador.
+3. Reinicia Windows manualmente, siguiendo las instrucciones de VB-Audio.
+   Comprueba que tu microfono predeterminado siga siendo el microfono real:
+   Windows puede seleccionar CABLE Output tras instalar el dispositivo.
+4. Abre RESONIQ. En Salida de audio selecciona tus altavoces o auriculares.
+5. En Entrada virtual selecciona CABLE Input (VB-Audio Virtual Cable).
+6. Selecciona ese mismo CABLE Input como salida de Windows.
+7. En el panel de VB-CABLE comprueba que Loopback y Windows Volume Control
+   estan activos. Prueba volumen cero, mute y primer paso antes del uso habitual.
+
+VB-CABLE pertenece a VB-Audio; es donationware. Identificacion y licencia:
+https://vb-audio.com/Services/licensing.htm
+El uso profesional o en organizaciones tiene requisitos de licencia adicionales.
+Este MSI no instala ni retira el controlador de VB-Audio. Activa solamente su
+ajuste persistente de control de volumen de Windows; la descarga se realiza
+con el asistente RESONIQ y la instalacion con el instalador oficial de VB-Audio.
+
+Los datos de RESONIQ viven en %LOCALAPPDATA%\RESONIQ. Conserva copias de config.
+El DSP y el perfil favorito no dependen del proveedor del transporte virtual.
+El driver propio permanece disponible en maquinas donde ya esta instalado.
+
+Si no oyes sonido: confirma que RESONIQ esta abierto, que la entrada virtual
+coincide con la salida de Windows y que la salida fisica es la correcta.
+Para escuchar sin RESONIQ, selecciona tus altavoces como salida de Windows.
+Cerrar la ventana normalmente mantiene la aplicacion activa en la bandeja.
+
+Esta version tiene pruebas de deteccion, persistencia, GUI y ruta propia WASAPI.
+La ruta VB-CABLE necesita validacion real tras instalar el paquete en un equipo
+de prueba: volumen, latencia, continuidad y recuperacion. No se ha grabado
+microfono ni cambiado la seguridad de arranque para estas comprobaciones.

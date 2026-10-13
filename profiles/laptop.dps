@@ -1,0 +1,22 @@
+version 1
+name "Portatil generico"
+device "Laptop"
+preset "Laptop Max"
+output_id ""
+raw 1
+enabled 1
+adaptive 1
+bass 0.800000012
+clarity 0.5
+dynamics 0.800000012
+spatial 0.200000003
+intensity 1
+agc_attack_ms 100
+agc_release_ms 1500
+highpass_hz 45
+body_hz 190
+body_db 7
+presence_hz 2600
+presence_db 6
+harmonic_gain 1.20000005
+stereo_amount 0.5

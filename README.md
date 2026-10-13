@@ -2,7 +2,7 @@
 
 ![Icono de RESONIQ](assets/brand/resoniq-app-128.png)
 
-[Descargar el instalador 0.2.5 para Windows x64](https://github.com/valvik77/Resoniq/releases/tag/v0.2.5).
+[Descargar el instalador 0.2.9 para Windows x64](https://github.com/valvik77/Resoniq/releases/tag/v0.2.9).
 Instala RESONIQ y usa el asistente de VB-CABLE incluido al finalizar.
 El instalador activa el control de volumen de Windows del cable. Tras instalar
 VB-CABLE, reinicia Windows y selecciona CABLE Input como salida de Windows
@@ -114,7 +114,7 @@ No sustituye un instalador ni la firma de producción.
 
 ## Instalador y dispositivo virtual
 
-El instalador local actual es `dist/RESONIQ-Setup-0.2.9-x64-VBCABLE.msi`,
+El instalador actual es `dist/RESONIQ-Setup-0.2.9-x64-VBCABLE.msi`,
 generada con `installer/Build-CableInstaller.ps1`. Instala RESONIQ y añade
 un asistente «Instalar VB-CABLE» al menú Inicio; al finalizar ofrece abrirlo.
 Descarga, verifica las firmas y extrae el paquete oficial, y abre su instalador

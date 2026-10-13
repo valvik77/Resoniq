@@ -382,6 +382,13 @@ real (aún no instalado). Ver PROJECT_MEMORY.md y VB-CABLE.txt para continuar.
 
 # Preparación automática de VB-CABLE — 13 de octubre de 2026
 
+Último estado publicado: MSI0.2.5 y commit533553d corrigen mantenimiento:
+WINDOWSBUILD Secure=yes y condición Installed OR requisitos iniciales.
+Release https://github.com/valvik77/Resoniq/releases/tag/v0.2.5.
+Usuario pide guardar, commit y subir. Próxima verificación: instalación0.2.5
+y reparación real confirmadas por usuario; no efectuadas por agente.
+Leer PROJECT_MEMORY.md para estado actual, que sustituye versiones anteriores.
+
 Actualización identidad: usuario elige «Pulso continuo» (cinta onda azul/cian).
 Integrada en ejecutable, bandeja con3estados, accesos y arteMSI0.2.4.
 Originales/variantes assets/brand, generador scripts/build_brand_icons.py.

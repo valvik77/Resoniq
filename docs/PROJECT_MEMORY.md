@@ -1,5 +1,18 @@
 # Memoria del proyecto
 
+## Cierre y sincronización solicitados — 13 de octubre de 2026
+
+Usuario pide guardar memoria, hacer commit y subir a GitHub. Corrección MSI
+ya publicada en main mediante commit533553d y releasev0.2.5:
+https://github.com/valvik77/Resoniq/releases/tag/v0.2.5.
+Asset: RESONIQ-Setup-0.2.5-x64-VBCABLE.msi. Se conservan identidad Pulso
+continuo, asistente VB-CABLE, control de volumen automático y sonido aprobado.
+Pendiente al retomar: usuario instala0.2.5 y confirma reparación real; las
+pruebas anteriores evaluaron condiciones con motor MSI y layout extraído,
+no una transacción de reparación. No afirmar que ya se actualizó ProgramFiles.
+No nuevas mediciones de micrófono autorizadas. Repositorio público main/origin
+configurados; exclusiones de claves, datos personales y builds siguen vigentes.
+
 ## Reparación MSI corregida — 13 de octubre de 2026
 
 Usuario muestra rechazo Windows11 al reparar. Host real CurrentBuildNumber26300,

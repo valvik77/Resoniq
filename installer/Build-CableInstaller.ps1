@@ -33,7 +33,7 @@ foreach($taskRelative in ($taskFiles.Keys | Sort-Object)) {
  [void]$taskComponent.AppendChild($taskFile);[void]$taskGroup.AppendChild($taskComponent);$taskIndex++
 }
 $taskXml.Save((Join-Path $taskPayload 'Files.wxs'))
-$taskMsi=Join-Path $taskRoot 'dist/RESONIQ-Setup-0.2.4-x64-VBCABLE.msi'
+$taskMsi=Join-Path $taskRoot 'dist/RESONIQ-Setup-0.2.5-x64-VBCABLE.msi'
 & (Join-Path $taskRoot 'build/tools/wix/wix.exe') build (Join-Path $PSScriptRoot 'CableProduct.wxs') (Join-Path $taskPayload 'Files.wxs') -arch x64 -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -culture es-es -d ('Payload='+$taskPayload) -o $taskMsi
 if($LASTEXITCODE -ne 0){throw 'Cable MSI build failed'}
 Write-Output $taskMsi

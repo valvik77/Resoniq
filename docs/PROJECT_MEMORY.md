@@ -1,5 +1,20 @@
 # Memoria del proyecto
 
+## Reparación MSI corregida — 13 de octubre de 2026
+
+Usuario muestra rechazo Windows11 al reparar. Host real CurrentBuildNumber26300,
+compatible. MSI anterior WINDOWSBUILD no Secure: se puede perder en elevación;
+condición tampoco exceptuaba mantenimiento. CableProduct y Product corregidos:
+WINDOWSBUILD Secure=yes; Installed OR (requisitos iniciales). MSI vigente0.2.5.
+Prueba con motor MSI real OpenPackage/EvaluateCondition, sin transacción:
+Installed1+buildvacío pasa; instalación nueva build19045 rechaza;26300 acepta.
+MSI extraído/scripts/GUI/WASAPI propio pasan; evidencia
+build/installer-test-c87842f4aa1a408b99c4d3e17bb6a4d2. Logs locales anteriores
+MSIe6ce8.LOG/MSIe3cdf.LOG solo muestran aviso, no permiten afirmar trazado
+completo de propiedades. No reparación/transacción real hecha por agente.
+Publicar corrección y MSI0.2.5 en GitHub; instalar nueva versión para reemplazar
+condición del MSI anterior. Audio/perfil/driver conservados, app relanzada.
+
 ## Publicación GitHub solicitada — 13 de octubre de 2026
 
 Usuario autoriza subir a valvik77/resoniq. Repositorio remoto canónico público

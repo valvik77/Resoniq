@@ -1,4 +1,4 @@
-RESONIQ 0.2.4 - transporte VB-CABLE
+RESONIQ 0.2.5 - transporte VB-CABLE
 
 El MSI activa automaticamente Windows Volume Control de VB-CABLE en su
 configuracion persistente. Si VB-CABLE ya estaba instalado, reinicia Windows

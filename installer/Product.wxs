@@ -3,8 +3,8 @@
     <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="Ya hay una version mas reciente de RESONIQ instalada." />
     <MediaTemplate EmbedCab="yes" />
     <Property Id="DpsSigningMode" Value="$(var.SigningMode)" />
-    <Launch Condition="VersionNT64 AND Msix64 AND MsiNTProductType=1 AND WINDOWSBUILD &gt;= 22621" Message="RESONIQ y su dispositivo DSP requieren Windows 11 22H2 o posterior, x64." />
-    <Property Id="WINDOWSBUILD"><RegistrySearch Id="Build" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentBuildNumber" Type="raw" Bitness="always64" /></Property>
+    <Launch Condition="Installed OR (VersionNT64 AND Msix64 AND MsiNTProductType=1 AND WINDOWSBUILD &gt;= 22621)" Message="RESONIQ y su dispositivo DSP requieren Windows 11 22H2 o posterior, x64." />
+    <Property Id="WINDOWSBUILD" Secure="yes"><RegistrySearch Id="Build" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentBuildNumber" Type="raw" Bitness="always64" /></Property>
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <ui:WixUI Id="WixUI_FeatureTree" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.Payload)/license.rtf" />

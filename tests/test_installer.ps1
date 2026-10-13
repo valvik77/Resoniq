@@ -38,6 +38,21 @@ if($taskRollback.Execute -ne 'rollback' -or $taskRollback.ExeCommand -notmatch '
 }
 $taskLaunch=$taskXml.SelectSingleNode('//w:Launch',$taskManager)
 if($taskLaunch.Condition -notmatch 'Msix64' -or $taskLaunch.Condition -notmatch '22621'){throw 'Architecture/OS checks missing'}
+if($taskLaunch.Condition -notmatch '^Installed OR '){throw 'OS check blocks maintenance'}
+$taskSecure=$taskXml.SelectSingleNode('//w:Property[@Id="WINDOWSBUILD"]',$taskManager)
+if($taskSecure.Secure -ne 'yes'){throw 'Windows build search is lost during elevation'}
+# Evaluate the actual MSI condition without running an installation transaction.
+$taskEngine=New-Object -ComObject WindowsInstaller.Installer
+$taskSession=$taskEngine.OpenPackage($taskMsi,1)
+$taskCondition=$taskLaunch.Condition
+$taskSession.Property('Installed')='1';$taskSession.Property('WINDOWSBUILD')=''
+if($taskSession.EvaluateCondition($taskCondition) -ne 1){throw 'Maintenance fails with missing OS search'}
+$taskSession.Property('Installed')='';$taskSession.Property('WINDOWSBUILD')='19045'
+if($taskSession.EvaluateCondition($taskCondition) -ne 0){throw 'Fresh install accepts unsupported Windows'}
+$taskSession.Property('WINDOWSBUILD')='26300'
+if($taskSession.EvaluateCondition($taskCondition) -ne 1){throw 'Fresh install rejects compatible Windows x64'}
+[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($taskSession)
+[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($taskEngine)
 $taskInstalled=Join-Path $taskWork 'application'
 New-Item -ItemType Directory -Path $taskInstalled | Out-Null
 $taskFiles=$taskXml.SelectNodes('//w:Directory[@Id="INSTALLFOLDER"]//w:File',$taskManager)

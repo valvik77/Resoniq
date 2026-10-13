@@ -61,6 +61,9 @@ try {
         for(float amount:{0.f,.01f,.1f,.25f,.5f,.75f,1.f}) {
             phase.setIntensity(amount);phase.process(signal.data(),processed.data(),512);
         }
+        for(float db:{-12.f,0.f,3.f,6.f,12.f}) {
+            phase.setGainDb(db);phase.process(signal.data(),processed.data(),512);
+        }
         watch=false;check(allocations==0,"Aligned intensity allocates on audio thread");
     }
     dps::Engine mono;mono.prepare(48000,dps::preset("Laptop Max"));std::vector<float> input(96000),output(input.size());

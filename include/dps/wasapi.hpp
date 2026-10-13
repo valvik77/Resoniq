@@ -5,7 +5,7 @@
 #include "dps/engine.hpp"
 #include "dps/audio_gap.hpp"
 namespace dps {
-struct Endpoint {std::wstring id,name;bool capture=false;float peak=0;bool defaultRender=false;float volume=-1;bool muted=false;std::wstring interfaceName;};
+struct Endpoint {std::wstring id,name;bool capture=false;float peak=0;bool defaultRender=false;float volume=-1;bool muted=false;std::wstring interfaceName;bool defaultCapture=false;};
 std::vector<Endpoint> endpoints();
 // Control thread only. Explicit physical endpoint volume, in [0,1].
 void setEndpointVolume(const std::wstring& id,float volume);
@@ -15,6 +15,7 @@ struct LiveState {
     std::atomic<float> bass=.3f,clarity=.25f,dynamics=.3f,spatial=.15f;
     std::atomic<float> dynamicLiftDb=0,transientLiftDb=0;
     std::atomic<float> intensity=1,inputPeak=0,outputPeak=0,reduction=0,enhancement=1;
+    std::atomic<float> gainDb=0,processedPeak=0,dspGainDb=0;
     std::atomic<unsigned> underruns=0,overflows=0,discontinuities=0,queued=0;
     // Estimated latency from endpoint reports, render capacity and FIFO size.
     // This is not a measured acoustic or electrical end-to-end round trip.
@@ -30,6 +31,7 @@ struct CaptureResult {
     std::vector<float> recorded,silence; double rate=48000;
     unsigned discontinuities=0;std::size_t missingFrames=0;
     std::vector<AudioGap> gaps;
+    bool rawInput=false;std::string rawInputError;unsigned selectedChannel=0;
 };
 CaptureResult captureMeasurement(const std::wstring& outputId,const std::wstring& inputId,
                                  const std::vector<float>& tones,bool rawOutput=false);

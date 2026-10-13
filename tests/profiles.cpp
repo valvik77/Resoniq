@@ -52,6 +52,10 @@ int main() {
         p.parameters.device=dps::deviceCalibration("Laptop");p.parameters.alignedIntensity=true;p.parameters.device.transientAccentDb=4;
         dps::saveProfile(path,p);check(dps::loadProfile(path).parameters.alignedIntensity,"Experimental intensity flag lost on save");
         check(dps::loadProfile(path).parameters.device.transientAccentDb==4,"Transient accent lost on save");
+        p.parameters.gainDb=6;dps::saveProfile(path,p);
+        check(dps::loadProfile(path).parameters.gainDb==6,"Gain lost during profile roundtrip");
+        p.parameters.gainDb=0;dps::saveProfile(path,p);
+        {std::ifstream input(path);const std::string bytes((std::istreambuf_iterator<char>(input)),{});check(bytes.find("gain_db")==std::string::npos,"Zero Gain rewrites legacy profile format");}
         std::filesystem::remove(path);std::cout<<"PASS: 56 device/preset combinations, exact DSP roundtrip, locale independence, invalid and incomplete profiles\n";
     }catch(const std::exception& e) {std::filesystem::remove(path);std::cerr<<e.what()<<'\n';return 1;}
 }

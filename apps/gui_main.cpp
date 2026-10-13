@@ -1,5 +1,6 @@
 #include "gui_theme.hpp"
 #include "gui_icons.hpp"
+#include "resoniq_version.h"
 #include "audio_session.hpp"
 #include "dps/endpoint_selection.hpp"
 #include "dps/virtual_transport.hpp"
@@ -44,7 +45,7 @@ void rounded(HDC dc,RECT r,COLORREF fill,COLORREF border,int radius) {
     Gdiplus::SolidBrush brush(color(fill));graphics.FillPath(&brush,&path);
     Gdiplus::Pen pen(color(border),1.f);graphics.DrawPath(&pen,&path);
 }
-enum {Output=101,Device,Preset,Input,Toggle=105,Load,Save,Refresh,Raw,Reference=112,Route,SetDefault,Settings,Minimise,Close,Detect,Measure,Slider=200};
+enum {Output=101,Device,Preset,Input,Toggle=105,Load,Save,Refresh,Raw,Reference=112,Route,SetDefault,Settings,Minimise,Close,Detect,Measure,About,Slider=200};
 // Tray icon: keeps processing alive while the window is out of the way, the
 // way a system-wide audio enhancer is normally used.
 constexpr UINT TrayMessage=WM_APP+1;
@@ -64,7 +65,7 @@ using Session=resoniq::ui::AudioSession;
 struct App {
     HWND window{},output{},input{},device{},preset{},toggle{},raw{};
     HWND hovered{};
-    std::array<HWND,5> sliders{};
+    std::array<HWND,6> sliders{};
     std::array<float,96> activity{};
     HFONT font{},titleFont{};
     HBRUSH cardBrush=CreateSolidBrush(theme.card);
@@ -76,13 +77,13 @@ struct App {
     Session session;
     std::ofstream telemetry;unsigned ticks=0;
     bool selfTest=false,audioTest=false,routed=false,tray=false,quitting=false,startTray=false,measurementDiagnostics=false;
-    Preferences prefs{};HWND settings=nullptr;unsigned reconnectAt=0;
+    Preferences prefs{};HWND settings=nullptr,about=nullptr;unsigned reconnectAt=0;
     bool firstRun=false,powerSuspended=false,resumeAudio=false;
     ~App(){session.stop();DeleteObject(font);DeleteObject(titleFont);DeleteObject(cardBrush);}
     int scale(int n) const {return MulDiv(n,static_cast<int>(GetDpiForWindow(window)),96);}
     void paintChrome(HWND h,HDC dc) {
-        RECT r;GetClientRect(h,&r);const int id=GetDlgCtrlID(h);const bool slider=id>=Slider&&id<Slider+5;
-        auto base=CreateSolidBrush(slider?theme.card:theme.background);FillRect(dc,&r,base);DeleteObject(base);
+        RECT r;GetClientRect(h,&r);const int id=GetDlgCtrlID(h);const bool slider=id>=Slider&&id<Slider+6;
+        auto base=CreateSolidBrush(slider&&id!=Slider+5?theme.card:theme.background);FillRect(dc,&r,base);DeleteObject(base);
         const bool enabled=IsWindowEnabled(h)!=FALSE,hot=hovered==h,focused=GetFocus()==h;
         SetBkMode(dc,TRANSPARENT);SelectObject(dc,font);SetTextColor(dc,enabled?theme.text:theme.mutedText);
         if(slider) {
@@ -130,7 +131,7 @@ struct App {
         if(message==WM_MOUSELEAVE) {if(app->hovered==h) app->hovered=nullptr;InvalidateRect(h,nullptr,FALSE);}
         if(message==WM_SETFOCUS||message==WM_KILLFOCUS||message==WM_ENABLE) InvalidateRect(h,nullptr,FALSE);
         const int id=GetDlgCtrlID(h);
-        const bool chrome=id==Output||id==Input||id==Device||id==Preset||id==Raw||(id>=Slider&&id<Slider+5)||(id>=SetStart&&id<=SetTheme);
+        const bool chrome=id==Output||id==Input||id==Device||id==Preset||id==Raw||(id>=Slider&&id<Slider+6)||(id>=SetStart&&id<=SetTheme);
         if(chrome&&message==WM_PAINT) {
             // Draw into an off-screen bitmap first: repaints are frequent now
             // and painting straight to the window would flicker during drags.
@@ -185,7 +186,7 @@ struct App {
         // its own classic thumb, which leaked over the Fluent slider. Removing
         // the visual theme stops that drawing at the source instead of
         // repainting over it afterwards; keyboard and mouse logic are intact.
-        if(id>=Slider&&id<Slider+5) SetWindowTheme(h,L" ",L" ");
+        if(id>=Slider&&id<Slider+6) SetWindowTheme(h,L" ",L" ");
         // The dropped-down list is a window of its own; without stripping its
         // theme Windows frames it with a light border that we never draw.
         if(!lstrcmpiW(cls,WC_COMBOBOXW)) {
@@ -213,6 +214,7 @@ struct App {
     void sync() {
         const auto& p=profile.parameters;const std::array<float,5> values{p.bass,p.clarity,p.dynamics,p.spatial,p.intensity};
         for(std::size_t i=0;i<5;++i) SendMessageW(sliders[i],TBM_SETPOS,TRUE,static_cast<LPARAM>(std::lround(values[i]*100)));
+        SendMessageW(sliders[5],TBM_SETPOS,TRUE,static_cast<LPARAM>(std::lround(p.gainDb*2+24)));
         int d=7;for(int i=0;i<7;++i) if(profile.deviceName==devices[i]) d=i;SendMessageW(device,CB_SETCURSEL,d,0);
         for(int i=0;i<4;++i) if(profile.presetName==presets[i]||wide(profile.presetName)==presetLabels[i]) SendMessageW(preset,CB_SETCURSEL,i,0);
         SendMessageW(raw,BM_SETCHECK,profile.raw?BST_CHECKED:BST_UNCHECKED,0);
@@ -225,6 +227,8 @@ struct App {
         p.dynamics=static_cast<float>(SendMessageW(sliders[2],TBM_GETPOS,0,0))/100;
         p.spatial=static_cast<float>(SendMessageW(sliders[3],TBM_GETPOS,0,0))/100;
         p.intensity=static_cast<float>(SendMessageW(sliders[4],TBM_GETPOS,0,0))/100;
+        p.gainDb=(static_cast<float>(SendMessageW(sliders[5],TBM_GETPOS,0,0))-24)/2;
+        session.state.gainDb=p.gainDb;
         session.state.bass=p.bass;session.state.clarity=p.clarity;session.state.dynamics=p.dynamics;session.state.spatial=p.spatial;session.state.intensity=p.intensity;
         InvalidateRect(window,nullptr,FALSE);
     }
@@ -247,10 +251,12 @@ struct App {
         move(sliders[4],260,435,495,32);
         for(int i=0;i<4;++i) move(sliders[i],260,495+i*55,495,32);
         move(raw,30,806,420,28);
+        move(sliders[5],550,803,220,32);
+        move(GetDlgItem(window,About),720,877,130,30);
     }
     void init() {
         font=CreateFontW(-scale(16),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,L"Segoe UI Variable Text");
-        titleFont=CreateFontW(-scale(40),0,0,0,FW_SEMIBOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,L"Segoe UI Variable Display");
+        titleFont=CreateFontW(-scale(40),0,0,0,FW_BOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,L"Segoe UI");
         output=control(WC_COMBOBOXW,L"",CBS_DROPDOWNLIST|CBS_OWNERDRAWFIXED|CBS_HASSTRINGS|WS_TABSTOP|WS_VSCROLL,Output);
         input=control(WC_COMBOBOXW,L"",CBS_DROPDOWNLIST|CBS_OWNERDRAWFIXED|CBS_HASSTRINGS|WS_TABSTOP|WS_VSCROLL,Input);
         device=control(WC_COMBOBOXW,L"",CBS_DROPDOWNLIST|CBS_OWNERDRAWFIXED|CBS_HASSTRINGS|WS_TABSTOP,Device);
@@ -261,10 +267,13 @@ struct App {
             const auto h=control(WC_BUTTONW,pair.second,BS_OWNERDRAW|WS_TABSTOP,pair.first);if(pair.first==Toggle) toggle=h;
         }
         control(WC_BUTTONW,L"Ajuste por defecto",BS_OWNERDRAW|WS_TABSTOP,Reference);control(WC_BUTTONW,L"Fijar actual",BS_OWNERDRAW|WS_TABSTOP,SetDefault);control(WC_BUTTONW,L"Detectar",BS_OWNERDRAW|WS_TABSTOP,Detect);control(WC_BUTTONW,L"Medir",BS_OWNERDRAW|WS_TABSTOP,Measure);control(WC_BUTTONW,L"Ajustes",BS_OWNERDRAW|WS_TABSTOP,Settings);
+        control(WC_BUTTONW,L"Acerca de",BS_OWNERDRAW|WS_TABSTOP,About);
         // Our own window buttons, since the system title bar is gone.
         control(WC_BUTTONW,L"",BS_OWNERDRAW,Minimise);control(WC_BUTTONW,L"",BS_OWNERDRAW,Close);control(WC_BUTTONW,L"Sonido Windows",BS_OWNERDRAW|WS_TABSTOP,Route);
         raw=control(WC_BUTTONW,L"Omitir efectos adicionales de Windows",BS_AUTOCHECKBOX|WS_TABSTOP,Raw);
         for(int i=0;i<5;++i) {sliders[i]=control(TRACKBAR_CLASSW,L"",TBS_HORZ|TBS_NOTICKS|WS_TABSTOP,Slider+i);SendMessageW(sliders[i],TBM_SETRANGE,TRUE,MAKELPARAM(0,100));SendMessageW(sliders[i],TBM_SETPAGESIZE,0,10);}
+        sliders[5]=control(TRACKBAR_CLASSW,L"",TBS_HORZ|TBS_NOTICKS|WS_TABSTOP,Slider+5);
+        SendMessageW(sliders[5],TBM_SETRANGE,TRUE,MAKELPARAM(0,48));SendMessageW(sliders[5],TBM_SETPAGESIZE,0,2);
         wchar_t path[32768];const DWORD n=GetModuleFileNameW(nullptr,path,32768);if(!n||n==32768) throw std::runtime_error("No se pudo localizar la aplicacion");
         // Support nested build directories and a future installed layout.
         root=std::filesystem::path(path).parent_path();
@@ -621,7 +630,7 @@ struct App {
         theme=light?lightPalette:darkPalette;
         if(auto replacement=CreateSolidBrush(theme.card)) {DeleteObject(cardBrush);cardBrush=replacement;}
         BOOL dark=light?FALSE:TRUE;
-        for(HWND frame:{window,settings}) if(frame) {
+        for(HWND frame:{window,settings,about}) if(frame) {
             DwmSetWindowAttribute(frame,DWMWA_USE_IMMERSIVE_DARK_MODE,&dark,sizeof(dark));
             RedrawWindow(frame,nullptr,nullptr,RDW_INVALIDATE|RDW_ALLCHILDREN|RDW_UPDATENOW|RDW_FRAME);
         }
@@ -671,6 +680,13 @@ struct App {
         if(index>=0&&static_cast<std::size_t>(index)<physical.size()) endpointName=physical[index].name;
         return dps::suggestCalibration(dps::detectHardware(endpointName));
     }
+    bool portableMeasurement() const {
+        if(profile.deviceName=="Headphones"||profile.deviceName=="External") return false;
+        if(profile.deviceName.rfind("Laptop",0)==0) return true;
+        const auto index=static_cast<int>(SendMessageW(output,CB_GETCURSEL,0,0));
+        const auto hardware=dps::detectHardware(index>=0&&static_cast<std::size_t>(index)<physical.size()?physical[index].name:L"");
+        return hardware.portable&&!hardware.headphones;
+    }
     void applyDetected(bool announce) {
         const auto suggestion=detectCalibration();
         profile.deviceName=suggestion.deviceName;
@@ -692,6 +708,9 @@ struct App {
             if(micId.empty()||name.find(L"icr")!=std::wstring::npos) {
                 micId=endpoint.id;micName=name;micVolume=endpoint.volume;
                 micMuted=endpoint.muted;
+            }
+            if(endpoint.defaultCapture) {
+                micId=endpoint.id;micName=name;micVolume=endpoint.volume;micMuted=endpoint.muted;break;
             }
         }
         if(micId.empty()) {
@@ -775,16 +794,19 @@ struct App {
                     <<" alignment_ms="<<measurement.alignmentMs
                     <<" reliable_bands="<<measurement.reliableBands
                     <<" output_raw="<<profile.raw
+                    <<" input_raw="<<captured.rawInput
+                    <<" capture_channel="<<captured.selectedChannel
                     <<" discontinuities="<<captured.discontinuities
                     <<" missing_frames="<<captured.missingFrames
                     <<" output_id="<<utf8(outputIdToMeasure)
                     <<" mic="<<utf8(micName)<<char(10);
+                if(!captured.rawInputError.empty()) dump<<"raw_input_fallback="<<captured.rawInputError<<'\n';
                 for(std::size_t band=0;band<dps::measureBands.size();++band)
                     dump<<"band_hz="<<dps::measureBands[band]<<" level_db="<<measurement.levelDb[band]<<'\n';
                 for(const auto& gap:captured.gaps)
                     dump<<"gap_begin="<<gap.begin<<" gap_frames="<<gap.frames<<'\n';
                 if(measurement.usable) {
-                    const auto proposal=dps::calibrationFrom(measurement,true);
+                    const auto proposal=dps::calibrationFrom(measurement,portableMeasurement(),profile.parameters.device);
                     dump<<"highpass_hz="<<proposal.highpassHz<<" body_db="<<proposal.bodyDb
                         <<" presence_db="<<proposal.presenceDb<<'\n';
                 }
@@ -798,6 +820,11 @@ struct App {
                     dps::writeWav(root/L"build/measure-recorded.wav",recording);
                 }
             } catch(...) {}
+            if(!captured.rawInput) {
+                if(!measurement.warning.empty()) measurement.warning+=' ';
+                measurement.warning+="El controlador no admitio captura RAW. Si oyes los tonos y la medida "
+                    "falla, revisa las mejoras de audio del microfono en Windows.";
+            }
         } catch(const std::exception& e) {
             try {std::ofstream(root/L"build/measure-debug.txt")<<"capture_error="<<e.what()<<'\n'
                 <<"output_raw="<<profile.raw<<" output_id="<<utf8(outputIdToMeasure)<<'\n';}catch(...) {}
@@ -823,7 +850,7 @@ struct App {
             MessageBoxW(window,message.c_str(),L"RESONIQ",MB_OK|MB_ICONWARNING);
             return;
         }
-        const auto proposal=dps::calibrationFrom(measurement,true);
+        const auto proposal=dps::calibrationFrom(measurement,portableMeasurement(),profile.parameters.device);
         std::wstring message=L"Respuesta medida de tus altavoces:\n\n";
         for(std::size_t b=0;b<dps::measureBands.size();++b) {
             wchar_t line[96];
@@ -843,7 +870,7 @@ struct App {
             static_cast<double>(proposal.presenceDb));
         message+=summary;
         if(!measurement.warning.empty()) message+=wide(measurement.warning)+L"\n\n";
-        message+=L"Medido con el microfono del portatil, que no es de medicion: "
+        message+=L"El microfono puede colorear la respuesta: "
               L"es un punto de partida para escuchar, no una calibracion exacta."
               L"\n\nAplicar esta calibracion?";
         if(MessageBoxW(window,message.c_str(),L"Resultado de la medicion",
@@ -875,10 +902,101 @@ struct App {
         const bool active=session.running();session.stop();profile=candidate;profilePath.clear();sync();if(active) ensureAudio();
         if(!active||routed) status=L"Ajuste: "+wide(profile.name);
     }
+    static LRESULT CALLBACK aboutProc(HWND h,UINT message,WPARAM w,LPARAM l) {
+        auto* app=reinterpret_cast<App*>(GetWindowLongPtrW(h,GWLP_USERDATA));
+        if(message==WM_CREATE) {
+            SetWindowLongPtrW(h,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(reinterpret_cast<CREATESTRUCTW*>(l)->lpCreateParams));
+            return 0;
+        }
+        if(!app) return DefWindowProcW(h,message,w,l);
+        switch(message) {
+        case WM_NCHITTEST: {
+            POINT p{GET_X_LPARAM(l),GET_Y_LPARAM(l)};ScreenToClient(h,&p);
+            return p.y<app->scale(100)?HTCAPTION:HTCLIENT;
+        }
+        case WM_ERASEBKGND:return 1;
+        case WM_PAINT: {
+            PAINTSTRUCT p;const auto dc=BeginPaint(h,&p);RECT r;GetClientRect(h,&r);
+            app->paintAbout(dc,r);EndPaint(h,&p);return 0;
+        }
+        case WM_DRAWITEM: {
+            auto* item=reinterpret_cast<DRAWITEMSTRUCT*>(l);
+            const bool focus=(item->itemState&ODS_FOCUS)!=0,down=(item->itemState&ODS_SELECTED)!=0;
+            auto brush=CreateSolidBrush(theme.background);FillRect(item->hDC,&item->rcItem,brush);DeleteObject(brush);
+            rounded(item->hDC,item->rcItem,down?theme.surfaceHot:theme.surface,focus?theme.accent:theme.border,app->scale(7));
+            SetBkMode(item->hDC,TRANSPARENT);SetTextColor(item->hDC,theme.text);SelectObject(item->hDC,app->font);
+            wchar_t caption[64];GetWindowTextW(item->hwndItem,caption,64);
+            DrawTextW(item->hDC,caption,-1,&item->rcItem,DT_CENTER|DT_VCENTER|DT_SINGLELINE);return TRUE;
+        }
+        case WM_COMMAND:
+            if(LOWORD(w)==IDOK||LOWORD(w)==IDCANCEL) {DestroyWindow(h);return 0;}
+            if(LOWORD(w)==501) {
+                if(reinterpret_cast<INT_PTR>(ShellExecuteW(h,L"open",L"https://vb-audio.com/Cable/",nullptr,nullptr,SW_SHOWNORMAL))<=32)
+                    MessageBoxW(h,L"No se pudo abrir la web de VB-Audio.",L"Acerca de",MB_OK|MB_ICONWARNING);
+                return 0;
+            }
+            break;
+        case WM_CLOSE:DestroyWindow(h);return 0;
+        case WM_DESTROY:app->about=nullptr;return 0;
+        }
+        return DefWindowProcW(h,message,w,l);
+    }
+    void paintAbout(HDC dc,RECT r) {
+        auto brush=CreateSolidBrush(theme.background);FillRect(dc,&r,brush);DeleteObject(brush);
+        SetBkMode(dc,TRANSPARENT);SetTextColor(dc,theme.text);
+        const auto logo=static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(1),IMAGE_ICON,scale(64),scale(64),LR_SHARED));
+        DrawIconEx(dc,scale(24),scale(24),logo,scale(64),scale(64),0,nullptr,DI_NORMAL);
+        SelectObject(dc,titleFont);TextOutW(dc,scale(104),scale(22),L"Resoniq",7);
+        SIZE nameSize{};GetTextExtentPoint32W(dc,L"Resoniq",7,&nameSize);
+        SelectObject(dc,font);TextOutW(dc,scale(104)+nameSize.cx+scale(10),scale(46),L"by Valvik",9);
+        RECT version{scale(104),scale(72),scale(580),scale(96)};
+        DrawTextW(dc,L"Versión " RESONIQ_VERSION_WTEXT L" · RESONIQ DSP Engine",-1,&version,DT_SINGLELINE);
+        rounded(dc,{scale(20),scale(112),r.right-scale(20),scale(402)},theme.card,theme.cardEdge,scale(12));
+        RECT text{scale(36),scale(130),r.right-scale(36),scale(390)};
+        DrawTextW(dc,
+            L"Este software ha sido desarrollado por Víctor Manuel Valenzuela.\n"
+            L"© 2026 Víctor Manuel Valenzuela (Valvik).\n\n"
+            L"Créditos a VB-CABLE\n"
+            L"VB-CABLE es un producto de VB-Audio Software.\n"
+            L"Copyright © Vincent Burel. Todos los derechos reservados.\n"
+            L"Programación: Vincent Burel y Jean-Sylvain Loezic.\n"
+            L"Gracias por el transporte de audio virtual. Se instala por separado y se rige por la licencia de VB-Audio.\n\n"
+            L"RESONIQ: software original bajo licencia MIT.\n"
+            L"Código y actualizaciones: github.com/valvik77/Resoniq",-1,&text,DT_LEFT|DT_WORDBREAK|DT_NOPREFIX);
+    }
+    void openAbout() {
+        if(about) {ShowWindow(about,SW_SHOW);SetForegroundWindow(about);return;}
+        static bool registered=false;
+        if(!registered) {
+            WNDCLASSW wc{};wc.lpfnWndProc=aboutProc;wc.hInstance=GetModuleHandleW(nullptr);
+            wc.lpszClassName=L"Resoniq.About";wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);
+            wc.hIcon=LoadIconW(wc.hInstance,MAKEINTRESOURCEW(1));
+            if(!RegisterClassW(&wc)) throw std::runtime_error("No se pudo preparar Acerca de");
+            registered=true;
+        }
+        RECT owner;GetWindowRect(window,&owner);
+        const int width=scale(640),height=scale(480);
+        about=CreateWindowExW(0,L"Resoniq.About",L"Acerca de Resoniq by Valvik",WS_POPUP|WS_CLIPCHILDREN,
+            owner.left+((owner.right-owner.left)-width)/2,owner.top+scale(150),width,height,
+            window,nullptr,GetModuleHandleW(nullptr),this);
+        if(!about) throw std::runtime_error("No se pudo abrir Acerca de");
+        for(const auto& button:std::array<std::pair<int,const wchar_t*>,2>{{{501,L"Web de VB-CABLE"},{IDOK,L"Cerrar"}}}) {
+            const auto c=CreateWindowExW(0,WC_BUTTONW,button.second,WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,
+                scale(button.first==IDOK?498:24),scale(432),scale(button.first==IDOK?118:190),scale(34),
+                about,reinterpret_cast<HMENU>(static_cast<INT_PTR>(button.first)),GetModuleHandleW(nullptr),nullptr);
+            SendMessageW(c,WM_SETFONT,reinterpret_cast<WPARAM>(font),TRUE);
+        }
+        BOOL dark=theme.background==darkPalette.background;
+        DwmSetWindowAttribute(about,DWMWA_USE_IMMERSIVE_DARK_MODE,&dark,sizeof(dark));
+        const DWM_WINDOW_CORNER_PREFERENCE corners=DWMWCP_ROUND;
+        DwmSetWindowAttribute(about,DWMWA_WINDOW_CORNER_PREFERENCE,&corners,sizeof(corners));
+        ShowWindow(about,SW_SHOW);SetForegroundWindow(about);SetFocus(GetDlgItem(about,IDOK));
+    }
     void command(int id,int notification) {
         if(id==Reference) recoverFavorite();
         else if(id==SetDefault) setAsDefault();
         else if(id==Settings) openSettings();
+        else if(id==About) openAbout();
         else if(id==Detect) applyDetected(true);
         else if(id==Measure) runMeasurement();
         else if(id==Minimise) ShowWindow(window,SW_MINIMIZE);
@@ -923,10 +1041,13 @@ struct App {
         auto label=[&](int x,int y,const std::wstring& value,COLORREF color=theme.text){SetTextColor(dc,color);TextOutW(dc,scale(x),scale(y),value.c_str(),static_cast<int>(value.size()));};
         auto box=[&](int x,int y,int w,int h,COLORREF color) {RECT r{scale(x),scale(y),scale(x+w),scale(y+h)};auto b=CreateSolidBrush(color);FillRect(dc,&r,b);DeleteObject(b);};
         rounded(dc,{scale(20),scale(18),scale(860),scale(193)},theme.card,theme.cardEdge,scale(12));
-        SelectObject(dc,titleFont);label(35,26,L"RESONIQ");SelectObject(dc,font);
+        const auto logo=static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(1),IMAGE_ICON,scale(64),scale(64),LR_SHARED));
+        DrawIconEx(dc,scale(35),scale(26),logo,scale(64),scale(64),0,nullptr,DI_NORMAL);
+        SelectObject(dc,titleFont);label(112,26,L"Resoniq");SelectObject(dc,font);
+        label(300,49,L"by Valvik",theme.mutedText);
         label(37,78,L"RESONIQ DSP Engine",theme.mutedText);
         label(37,105,L"Tu sonido. Con mas cuerpo.",theme.text);
-        label(430,105,L"Actividad de salida",theme.mutedText);
+        label(430,105,L"Actividad DSP",theme.mutedText);
         // Real peak history from the audio worker, rendered on the UI thread.
         std::array<POINT,192> wave{};
         for(std::size_t i=0;i<activity.size();++i) {
@@ -962,22 +1083,21 @@ struct App {
         // the gain the engine is actually adding, and note compression when
         // there is any, so the meter reflects the work being done.
         {
-            const float in=session.state.inputPeak.load(),out=session.state.outputPeak.load();
-            const float gain=(in>1e-4f&&out>1e-4f)?20*std::log10(out/in):0.f;
+            const float in=session.state.inputPeak.load();
+            const float gain=session.state.dspGainDb.load();
             const float cut=session.state.reduction.load();
             wchar_t number[96];
             if(in<=1e-4f) wcscpy_s(number,L" sin señal");
-            else if(cut>0.1f) swprintf_s(number,L" %+.1f dB  (comprime %.1f)",gain,cut);
             else swprintf_s(number,L" %+.1f dB",gain);
-            label(600,735,std::wstring(L"Realce")+number,theme.mutedText);box(600,765,250,7,theme.meter);
+            label(600,735,std::wstring(L"Realce DSP")+number,theme.mutedText);box(600,765,250,7,theme.meter);
             const float amount=std::clamp(gain/18,0.f,1.f);
             box(600,765,static_cast<int>(250*amount),7,theme.warm);
+            if(cut>.1f) {swprintf_s(number,L"Compresión: %.1f dB",cut);label(600,784,number,theme.mutedText);}
         }
-        if(profile.deviceName=="Laptop Focus"||profile.deviceName.rfind("Laptop Impact",0)==0) {
-            wchar_t value[128];swprintf_s(value,L"Detalle +%.1f dB | Ataque +%.1f dB",session.state.dynamicLiftDb.load(),session.state.transientLiftDb.load());label(490,806,value,theme.mutedText);
-        }
+        label(490,810,L"Gain",theme.mutedText);
+        wchar_t gainLabel[32];swprintf_s(gainLabel,L"%+.1f dB",profile.parameters.gainDb);label(780,810,gainLabel,theme.accent);
         label(30,855,status,theme.mutedText);
-        label(30,887,L"RESONIQ  /  Audio en tiempo real  /  Altavoces y auriculares",theme.mutedText);
+        label(30,887,L"Resoniq " RESONIQ_VERSION_WTEXT L"  /  Audio en tiempo real",theme.mutedText);
     }
     // Capture any window of ours, used to review the settings dialog too.
     // Grab from the screen, so a dropped-down list (its own window) is included.
@@ -1006,7 +1126,7 @@ struct App {
         RECT r;GetClientRect(target,&r);
         HDC dc=GetDC(target),mem=CreateCompatibleDC(dc);
         HBITMAP bmp=CreateCompatibleBitmap(dc,r.right,r.bottom);auto old=SelectObject(mem,bmp);
-        paintSettings(mem,r);
+        if(target==about) paintAbout(mem,r);else paintSettings(mem,r);
         for(HWND child=GetWindow(target,GW_CHILD);child;child=GetWindow(child,GW_HWNDNEXT)) {
             RECT b;GetWindowRect(child,&b);MapWindowPoints(HWND_DESKTOP,target,reinterpret_cast<POINT*>(&b),2);
             const int saved=SaveDC(mem);SetViewportOrgEx(mem,b.left,b.top,nullptr);
@@ -1043,6 +1163,17 @@ struct App {
         DeleteObject(bmp);DeleteDC(mem);ReleaseDC(window,dc);if(!out) throw std::runtime_error("Screenshot write failed");
     }
     void test() {
+        SendMessageW(sliders[5],TBM_SETPOS,TRUE,36);publish();
+        if(session.state.gainDb.load()!=6.f) throw std::runtime_error("Gain slider did not reach audio state");
+        SendMessageW(sliders[5],TBM_SETPOS,TRUE,24);publish();
+        if(!SendMessageW(window,WM_QUERYENDSESSION,0,ENDSESSION_CLOSEAPP))
+            throw std::runtime_error("Restart Manager shutdown request rejected");
+        SendMessageW(window,WM_ENDSESSION,FALSE,ENDSESSION_CLOSEAPP);
+        if(quitting||!IsWindow(window)) throw std::runtime_error("Cancelled shutdown closes application");
+        openAbout();
+        screenshot2(about,root/L"build/about-preview.bmp");
+        SendMessageW(about,WM_COMMAND,IDCANCEL,0);
+        if(about) throw std::runtime_error("Acerca de did not close");
         {
             const auto previousId=prefs.virtualInputId;
             dps::Endpoint simulated;simulated.id=L"test-vb-cable";simulated.name=L"CABLE Input (VB-Audio Virtual Cable)";
@@ -1258,12 +1389,17 @@ LRESULT CALLBACK procedure(HWND h,UINT message,WPARAM w,LPARAM l) {
                     }catch(const std::exception& e) {if(a->telemetry) a->telemetry<<"routing_check_error="<<e.what()<<'\n';}
                 }
                 if(a->telemetry) {
+                const auto& calibration=a->profile.parameters.device;
+                a->telemetry<<"device="<<a->profile.deviceName<<" gain_db="<<a->session.state.gainDb.load()
+                    <<" processed_output="<<a->session.state.processedPeak.load()<<" dsp_gain_db="<<a->session.state.dspGainDb.load()
+                    <<" highpass_hz="<<calibration.highpassHz<<" body_db="<<calibration.bodyDb<<" presence_db="<<calibration.presenceDb
+                    <<" loud_density="<<calibration.loudDensity<<" band_density="<<calibration.bandDensity<<' ';
 
                 a->telemetry<<"running="<<a->session.running()<<" finished="<<a->session.finished.load()<<" enabled="<<a->session.state.enabled.load()<<" intensity="<<a->session.state.intensity.load()<<" uptime_ms="<<GetTickCount64()<<" transient_db="<<a->session.state.transientLiftDb.load()<<" detail_db="<<a->session.state.dynamicLiftDb.load()<<" bass="<<a->session.state.bass.load()<<" clarity="<<a->session.state.clarity.load()<<" dynamics="<<a->session.state.dynamics.load()<<" spatial="<<a->session.state.spatial.load()<<" input="<<a->session.state.inputPeak.load()<<" output="<<a->session.state.outputPeak.load()<<" reduction="<<a->session.state.reduction.load()<<" under="<<a->session.state.underruns.load()<<" over="<<a->session.state.overflows.load()<<" latency_ms="<<a->session.state.latencyMs.load()<<'\n';a->telemetry.flush();
                 }
             }
             std::move(a->activity.begin()+1,a->activity.end(),a->activity.begin());
-            a->activity.back()=a->session.state.outputPeak.load();
+            a->activity.back()=a->session.state.processedPeak.load();
             InvalidateRect(h,nullptr,FALSE);return 0;
         case WM_MEASUREITEM:{auto* item=reinterpret_cast<MEASUREITEMSTRUCT*>(l);item->itemHeight=static_cast<UINT>(a->scale(24));return TRUE;}
         case WM_DRAWITEM: {
@@ -1400,6 +1536,12 @@ LRESULT CALLBACK procedure(HWND h,UINT message,WPARAM w,LPARAM l) {
                 }catch(const std::exception& e) {if(a->telemetry) a->telemetry<<"session_save_error="<<e.what()<<'\n';}
             }
             a->trayRemove();a->session.stop();DestroyWindow(h);return 0;
+        case WM_QUERYENDSESSION:
+            // A query may be cancelled. Keep the live session until confirmed.
+            return TRUE;
+        case WM_ENDSESSION:
+            if(w) {a->quitting=true;SendMessageW(h,WM_CLOSE,0,0);}
+            return 0;
         case WM_DESTROY:PostQuitMessage(0);return 0;
         }
     }catch(const std::exception& e) {a->status=L"Error: "+wide(e.what());if(a->selfTest||a->audioTest) {if(!a->root.empty()) std::ofstream(a->root/L"build/gui-test-result.txt")<<"FAIL: "<<e.what()<<'\n';PostQuitMessage(1);}else MessageBoxW(h,wide(e.what()).c_str(),L"RESONIQ",MB_OK|MB_ICONERROR);}
@@ -1423,7 +1565,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
     // taskbar entry and the minimise animation behave normally.
     const UINT dpi=GetDpiForSystem();
     const int clientWidth=MulDiv(880,dpi,96),clientHeight=MulDiv(920,dpi,96);
-    HWND h=CreateWindowExW(WS_EX_APPWINDOW,wc.lpszClassName,L"RESONIQ",
+    HWND h=CreateWindowExW(WS_EX_APPWINDOW,wc.lpszClassName,L"Resoniq by Valvik",
         WS_POPUP|WS_MINIMIZEBOX|WS_CLIPCHILDREN,CW_USEDEFAULT,CW_USEDEFAULT,
         clientWidth,clientHeight,nullptr,nullptr,instance,&app);if(!h) return 1;
     SendMessageW(h,WM_SETICON,ICON_SMALL,reinterpret_cast<LPARAM>(LoadImageW(instance,MAKEINTRESOURCEW(1),IMAGE_ICON,GetSystemMetrics(SM_CXSMICON),GetSystemMetrics(SM_CYSMICON),LR_SHARED)));
@@ -1442,6 +1584,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
     MSG msg{};int result=0;
     while((result=static_cast<int>(GetMessageW(&msg,nullptr,0,0)))>0) {
         if(app.settings&&IsDialogMessageW(app.settings,&msg)) continue;
+        if(app.about&&IsDialogMessageW(app.about,&msg)) continue;
         if(!IsDialogMessageW(h,&msg)) {TranslateMessage(&msg);DispatchMessageW(&msg);}
     }
     if(result<0) return 1;

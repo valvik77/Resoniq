@@ -1,17 +1,27 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package Name="RESONIQ" Manufacturer="RESONIQ" Version="0.2.5" UpgradeCode="B95F9C89-4D5B-4D1B-899B-65872A579D83" Scope="perMachine" Language="1034">
+  <Package Name="RESONIQ" Manufacturer="Valvik" Version="0.2.9" UpgradeCode="B95F9C89-4D5B-4D1B-899B-65872A579D83" Scope="perMachine" Language="1034">
     <Icon Id="ResoniqIcon" SourceFile="$(var.Payload)/resoniq.ico" />
     <Property Id="ARPPRODUCTICON" Value="ResoniqIcon" />
     <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="Ya hay una version mas reciente de RESONIQ instalada." />
     <MediaTemplate EmbedCab="yes" />
+    <Binary Id="ResoniqCloseActions" SourceFile="$(var.Payload)/resoniq_close.dll" />
+    <CustomAction Id="CloseRunningResoniq" BinaryRef="ResoniqCloseActions" DllEntry="CloseResoniq" Execute="immediate" Return="check" />
+    <InstallExecuteSequence>
+      <Custom Action="CloseRunningResoniq" Before="InstallValidate" Condition="NOT (REMOVE=&quot;ALL&quot;)" />
+    </InstallExecuteSequence>
     <Launch Condition="Installed OR (VersionNT64 AND Msix64 AND MsiNTProductType=1 AND WINDOWSBUILD &gt;= 22621)" Message="Esta version de RESONIQ requiere Windows 11 22H2 o posterior, x64." />
     <Property Id="WINDOWSBUILD" Secure="yes"><RegistrySearch Id="Build" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentBuildNumber" Type="raw" Bitness="always64" /></Property>
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Preparar la instalacion de VB-CABLE" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WixShellExecTarget" Value="[#CableLauncher]" />
+    <Property Id="WixUnelevatedShellExecTarget" Value="[#ResoniqExecutable]" />
+    <CustomAction Id="LaunchApplication" BinaryRef="Wix4UtilCA_X64" DllEntry="WixUnelevatedShellExec" Impersonate="yes" Return="ignore" />
     <CustomAction Id="LaunchInstructions" BinaryRef="Wix4UtilCA_X64" DllEntry="WixShellExec" Impersonate="yes" Return="ignore" />
-    <UI><Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchInstructions" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX=1 AND NOT Installed" /></UI>
+    <UI>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication" Order="1" Condition="NOT (REMOVE=&quot;ALL&quot;)" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchInstructions" Order="2" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX=1 AND NOT Installed" />
+    </UI>
     <WixVariable Id="WixUILicenseRtf" Value="$(var.Payload)/license.rtf" />
     <WixVariable Id="WixUIBannerBmp" Value="$(var.Payload)/installer-banner.bmp" />
     <WixVariable Id="WixUIDialogBmp" Value="$(var.Payload)/installer-dialog.bmp" />

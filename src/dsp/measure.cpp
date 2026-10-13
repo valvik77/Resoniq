@@ -137,11 +137,14 @@ Measurement analyseSweep(const float* recorded,std::size_t frames,double rate,
     }
     const float headroom=m.signalDb-m.noiseFloorDb;
     if(headroom<12) {
-        m.warning="Demasiado ruido de fondo: sube el volumen o busca un sitio mas silencioso.";
+        m.warning="Los tonos de prueba no se distinguen con suficiente margen en la captura. "
+                  "Esto no demuestra que la sala tenga demasiado ruido: comprueba que los tonos "
+                  "se oyen por la salida elegida y que el microfono no aplica supresion de ruido o eco.";
         return m;
     }
     if(m.reliableBands<2) {
-        m.warning="No se identificaron suficientes tonos: evita musica, voces y ruidos durante la medicion.";
+        m.warning="No se identificaron suficientes tonos estables. Comprueba la salida, el microfono "
+                  "y sus mejoras de audio; evita musica o voces durante la medicion.";
         return m;
     }
     if(headroom<20) m.warning="Margen de ruido justo: la medida es orientativa.";
@@ -151,6 +154,24 @@ Measurement analyseSweep(const float* recorded,std::size_t frames,double rate,
     }
     m.usable=true;
     return m;
+}
+unsigned selectMeasurementChannel(const Measurement& left,const Measurement& right) noexcept {
+    if(left.usable!=right.usable) return right.usable?1u:0u;
+    if(left.reliableBands!=right.reliableBands) return right.reliableBands>left.reliableBands?1u:0u;
+    return right.signalDb-right.noiseFloorDb>left.signalDb-left.noiseFloorDb?1u:0u;
+}
+DeviceCalibration calibrationFrom(const Measurement& measurement,bool portable,const DeviceCalibration& voicing) {
+    if(!measurement.usable||!std::all_of(measurement.levelDb.begin(),measurement.levelDb.end(),
+        [](float value){return std::isfinite(value);})) return voicing;
+    auto result=calibrationFrom(measurement,portable);
+    // Acoustic tones estimate broad EQ, not compression, attack or stereo
+    // preferences. A new room correction must not erase the chosen voicing.
+    result.harmonicGain=voicing.harmonicGain;result.harmonicFocus=voicing.harmonicFocus;
+    result.stereoAmount=voicing.stereoAmount;result.detailDb=voicing.detailDb;
+    result.bodyFloor=voicing.bodyFloor;result.adaptiveDepth=voicing.adaptiveDepth;
+    result.loudDensity=voicing.loudDensity;result.bandDensity=voicing.bandDensity;
+    result.transientAccentDb=voicing.transientAccentDb;
+    return result;
 }
 DeviceCalibration calibrationFrom(const Measurement& measurement,bool portable) {
     DeviceCalibration c;

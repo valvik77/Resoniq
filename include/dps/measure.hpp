@@ -26,11 +26,15 @@ struct Measurement {
 // Analyse a recording of the test tones. The recording is mono float32.
 Measurement analyseSweep(const float* recorded,std::size_t frames,double rate,
                          const float* silence,std::size_t silenceFrames,std::span<const AudioGap> gaps={});
+// Choose a coherent microphone channel; averaging opposite phases can erase
+// test tones on microphone arrays. Never choose by peak/loudness alone.
+unsigned selectMeasurementChannel(const Measurement& left,const Measurement& right) noexcept;
 
 // Turn a measurement into a starting calibration. This is a suggestion from one
 // microphone in one position: it is a starting point to listen to, not a
 // finished profile.
 DeviceCalibration calibrationFrom(const Measurement& measurement,bool portable);
+DeviceCalibration calibrationFrom(const Measurement& measurement,bool portable,const DeviceCalibration& voicing);
 
 // The test signal: short tones at each band, so a cheap microphone and a noisy
 // room still give a usable reading. Returns the stereo samples to play.

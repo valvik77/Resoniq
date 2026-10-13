@@ -1,5 +1,15 @@
 # Third-party components
 
+## VB-CABLE
+
+VB-CABLE is a separate product of VB-Audio Software, copyright Vincent Burel.
+Programming credits: Vincent Burel and Jean-Sylvain Loezic. Thank you for the
+virtual audio transport used by RESONIQ. VB-CABLE is installed separately and
+is subject to VB-Audio's own license, not RESONIQ's MIT license.
+
+Official product and licensing: https://vb-audio.com/Cable/ and
+https://vb-audio.com/Services/licensing.htm.
+
 The DSP (`include/dps/engine.hpp`, `src/dsp/engine.cpp`) is original project code under MIT. It does not use Bongiovi code.
 
 The virtual driver build reuses Microsoft SysVAD infrastructure from

@@ -62,6 +62,7 @@ Profile loadProfile(const std::filesystem::path& path) {
         else if(key=="dynamics") row>>v.dynamics;
         else if(key=="spatial") row>>v.spatial;
         else if(key=="intensity") row>>v.intensity;
+        else if(key=="gain_db") row>>v.gainDb;
         else if(key=="agc_attack_ms") row>>v.agcAttackMs;
         else if(key=="agc_release_ms") row>>v.agcReleaseMs;
         else if(key=="highpass_hz") row>>d.highpassHz;
@@ -100,6 +101,7 @@ void saveProfile(const std::filesystem::path& path,const Profile& p) {
        <<"\nenabled "<<v.enabled<<"\nadaptive "<<v.adaptive<<"\nbass "<<v.bass<<"\nclarity "<<v.clarity<<"\ndynamics "<<v.dynamics<<"\nspatial "<<v.spatial<<"\nintensity "<<v.intensity
        <<"\nagc_attack_ms "<<v.agcAttackMs<<"\nagc_release_ms "<<v.agcReleaseMs<<"\nhighpass_hz "<<d.highpassHz<<"\nbody_hz "<<d.bodyHz<<"\nbody_db "<<d.bodyDb<<"\npresence_hz "<<d.presenceHz<<"\npresence_db "<<d.presenceDb<<"\nharmonic_gain "<<d.harmonicGain<<"\nstereo_amount "<<d.stereoAmount<<"\nmud_hz "<<d.mudHz<<"\nmud_db "<<d.mudDb<<"\ndetail_db "<<d.detailDb<<"\nharmonic_focus "<<d.harmonicFocus<<"\nbody_floor "<<d.bodyFloor<<"\nadaptive_depth "<<d.adaptiveDepth<<"\nloud_density "<<d.loudDensity<<"\nband_density "<<d.bandDensity<<'\n';
     if(v.alignedIntensity) out<<"aligned_intensity 1\n";
+    if(v.gainDb!=0) out<<"gain_db "<<v.gainDb<<'\n';
     if(d.transientAccentDb>0) out<<"transient_accent_db "<<d.transientAccentDb<<'\n';
     file.commit();
 }

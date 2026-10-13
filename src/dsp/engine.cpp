@@ -50,6 +50,7 @@ void Engine::prepare(double rate,Parameters p) {
     p.bass=bounded(p.bass);p.clarity=bounded(p.clarity);p.dynamics=bounded(p.dynamics);p.spatial=bounded(p.spatial);p.intensity=bounded(p.intensity);
     const auto& d=p.device;
     auto valid=[](float v,float lo,float hi){return std::isfinite(v)&&v>=lo&&v<=hi;};
+    if(!valid(p.gainDb,-12,12)) throw std::invalid_argument("Invalid DSP gain");
     if(!valid(d.highpassHz,20,200)||!valid(d.bodyHz,100,500)||!valid(d.bodyDb,0,12)||!valid(d.presenceHz,1000,6000)||!valid(d.presenceDb,0,12)||!valid(d.harmonicGain,0,2)||!valid(d.stereoAmount,0,1)||!valid(d.mudHz,300,1200)||!valid(d.mudDb,-9,0)||!valid(d.detailDb,0,6)||!valid(d.harmonicFocus,0,1)||!valid(d.bodyFloor,0,1)||!valid(d.adaptiveDepth,0,0.9f)||!valid(d.loudDensity,1,2.5f)||!valid(d.bandDensity,1,4)) throw std::invalid_argument("Invalid device calibration");
     if(!valid(d.transientAccentDb,0,6)) throw std::invalid_argument("Invalid transient accent");
     parameters_=p;rate_=rate;
@@ -85,6 +86,7 @@ void Engine::reset() noexcept {
     comparisonIntensity_=parameters_.intensity;comparisonBlend_=parameters_.enabled?1.f:0.f;comparisonMix_=comparison_?1.f:0.f;comparisonSamples_=0;
     restartComparisonMeasurement();
     controls_={parameters_.bass,parameters_.clarity,parameters_.dynamics,parameters_.spatial};
+    gainAmplitude_=gainTarget_=std::pow(10.f,parameters_.gainDb/20.f);
     bassEnvelope_=0;levelEnvelope_=0;enhancement_=1;
     envelope_.fill(0);bandGain_.fill(1);agcEnvelope_=0;agcGain_=limiterGain_=1;mix_=parameters_.enabled?parameters_.intensity:0;meters_={};
     for(auto& transient:transients_) transient.reset();
@@ -100,6 +102,11 @@ void Engine::setComparison(bool enabled) noexcept {
 }
 void Engine::setIntensity(float v) noexcept {
     v=bounded(v);if(v!=parameters_.intensity) restartComparisonMeasurement();parameters_.intensity=v;
+}
+void Engine::setGainDb(float db) noexcept {
+    db=std::isfinite(db)?std::clamp(db,-12.f,12.f):0.f;
+    if(db==parameters_.gainDb) return;
+    parameters_.gainDb=db;gainTarget_=std::pow(10.f,db/20.f);
 }
 void Engine::setControls(float bass,float clarity,float dynamics,float spatial) noexcept {
     bass=bounded(bass);clarity=bounded(clarity);dynamics=bounded(dynamics);spatial=bounded(spatial);
@@ -236,6 +243,11 @@ void Engine::process(const float* input,float* output,std::size_t frames) noexce
         comparisonIntensity_+=controlSmoothing_*(parameters_.intensity-comparisonIntensity_);
         std::array<float,2> processed{},reference=dry;
         processed=intensityMix(wet,comparisonIntensity_);
+        if(gainAmplitude_!=1.f||gainTarget_!=1.f) {
+            gainAmplitude_+=controlSmoothing_*(gainTarget_-gainAmplitude_);
+            const float gain=1.f+comparisonIntensity_*(gainAmplitude_-1.f);
+            for(auto& sample:processed) sample*=gain;
+        }
         auto limit=[&](std::array<float,2>& samples,float& gain) {
             const float p=std::max(std::abs(samples[0]),std::abs(samples[1]));
             const float required=p>ceiling?ceiling/p:1.f;
@@ -270,6 +282,10 @@ void Engine::process(const float* input,float* output,std::size_t frames) noexce
         comparisonMix_+=controlSmoothing_*((comparison_?1.f:0.f)-comparisonMix_);
         mix_+=mixCoefficient_*((parameters_.enabled?parameters_.intensity:0)-mix_);
         wet=intensityMix(wet,mix_);
+        if(gainAmplitude_!=1.f||gainTarget_!=1.f) {
+            const float gain=1.f+mix_*(gainAmplitude_-1.f);
+            for(auto& sample:wet) sample*=gain;
+        }
         if(comparisonMix_>0) for(std::size_t ch=0;ch<2;++ch) {
             const float a=reference[ch]*comparisonDryGain_,b=processed[ch]*comparisonWetGain_;
             const float audition=a+comparisonBlend_*(b-a);

@@ -1,4 +1,5 @@
 #include "../src/audio/endpoint_silence.hpp"
+#include "../src/audio/output_volume.hpp"
 #include <array>
 #include <cstdlib>
 #include <iostream>
@@ -52,6 +53,23 @@ int main() {
         callback->OnNotify(&notification);check(callback->silent(),"Invalid endpoint volume opens output");
         check(callback->OnNotify(nullptr)==E_POINTER,"Null notification accepted");
         check(allocations==0,"Endpoint callback allocates");
+        dps::detail::OutputVolume volume;
+        volume.initialise(0);music=reference;
+        check(volume.apply(music.data(),4)==.8f&&music==reference,"100 percent volume changes approved samples");
+        volume.initialise(-58.1738f);music=reference;
+        const float atTwo=volume.apply(music.data(),4);
+        check(atTwo<.002f&&atTwo>0,"VB-CABLE 2 percent is full scale or muted");
+        check(std::abs(atTwo/.8f-std::pow(10.f,-58.1738f/20.f))<1e-6f,"Endpoint dB curve was replaced by linear scalar");
+        volume.setDb(-10.5086f);
+        float settled=0;
+        watch=true;
+        for(unsigned i=0;i<12000;++i) {music=reference;settled=volume.apply(music.data(),4);}
+        watch=false;
+        check(std::abs(settled/.8f-std::pow(10.f,-10.5086f/20.f))<1e-5f,"Normal volume did not settle to Windows gain");
+        check(settled>atTwo&&settled<.8f,"VB-CABLE volume is not progressive");
+        volume.initialise(std::numeric_limits<float>::quiet_NaN());music=reference;
+        check(volume.apply(music.data(),4)==0,"Invalid volume curve leaks audio");
+        check(allocations==0,"Post-DSP volume allocates on audio thread");
         std::cout<<"PASS: mute, zero volume, exact silence, unchanged normal samples, unmute, stale snapshot and allocation-free callback\n";
     } catch(const std::exception& error) {watch=false;std::cerr<<error.what()<<'\n';return 1;}
 }

@@ -52,10 +52,24 @@ adopta ninguno. 17/17 CTest. LÍMITE: la rama que sí adopta no se pudo ejecutar
 aquí porque este equipo no es el modelo conocido; falta comprobarla en el
 Lenovo con una instalación nueva (o con LocalAppData\RESONIQ\config vacío).
 
+Tercer paso, a petición del usuario: versión 0.2.12 y MSI nuevo.
+`dist/RESONIQ-Setup-0.2.12-x64-VBCABLE.msi`, SHA256
+`CEB5A6F82AA8A7BDD34478621BA9B935F1786182F4F2D1E989C45DCF9E6B6790`.
+Versión subida en `CMakeLists.txt` e `installer/CableProduct.wxs`; el binario
+empaquetado declara ProductVersion 0.2.12. Compilado con runtime estático en
+`build/installer-portable` (NMake + MSVC portable), porque la caché de
+`build/installer-release` es de Visual Studio 18 y aquí no hay VS instalado.
+`test_installer.ps1 -Cable -SkipAudioTest` pasa: incluye el autotest sobre la
+distribución extraída, de modo que el MSI lleva de verdad los seis perfiles
+que el primer arranque necesita. 17/17 CTest con la versión subida.
+NO publicado: sin etiqueta, sin release y sin instalar aquí; el enlace de
+descarga del README sigue apuntando a la v0.2.11. El usuario autorizó
+sobrescribir lo que tenga en el Lenovo al instalar esta 0.2.12.
+
 Siguen pendientes tras esta sesión: comprobar en el Lenovo la adopción del
 perfil aprobado al primer arranque, VolCtl del cable, «Medir» sobre el perfil,
 el caso Conexant con audio real y la escucha del usuario. Nada de esto se
-publica: 0.2.11 sigue siendo la versión distribuida y el MSI no se rehízo.
+publica aún: la versión distribuida sigue siendo la 0.2.11.
 
 ## Preparación de publicación 0.2.11 — 14 de octubre de 2026
 

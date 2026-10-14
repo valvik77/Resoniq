@@ -129,8 +129,9 @@ No sustituye un instalador ni la firma de producción.
 
 ## Instalador y dispositivo virtual
 
-El instalador actual es `dist/RESONIQ-Setup-0.2.11-x64-VBCABLE.msi`,
-generada con `installer/Build-CableInstaller.ps1`. Instala RESONIQ y añade
+El instalador actual es `dist/RESONIQ-Setup-0.2.12-x64-VBCABLE.msi`, generada
+con `installer/Build-CableInstaller.ps1` y aún sin publicar: el enlace de
+descarga del principio apunta a la 0.2.11. Instala RESONIQ y añade
 un asistente «Instalar VB-CABLE» al menú Inicio; al finalizar ofrece abrirlo.
 Descarga, verifica las firmas y extrae el paquete oficial, y abre su instalador
 con elevación. Quedan la autorización de administrador, «Install Driver» y el
@@ -152,6 +153,9 @@ archivos en uso, incluyendo versiones anteriores que se ocultan al recibir Cerra
 La GUI responde además al cierre de Restart Manager. Se guarda la sesión y se
 detiene el audio; el instalador vuelve a abrir RESONIQ al finalizar.
 Ver [INSTALLER_SHUTDOWN.md](docs/INSTALLER_SHUTDOWN.md).
+La 0.2.12 muestra el volumen de Windows de la salida física junto a su lista y
+arranca una instalación nueva con el perfil aprobado del modelo reconocido.
+No cambia el motor ni el sonido de una sesión ya guardada.
 La 0.2.9 añadió un control Gain que la 0.2.10 retira: con el perfil ya en el
 techo del limitador solo reducía el contraste de los golpes. Los perfiles que
 lo guardaron se siguen cargando, sin él. Actividad DSP y Realce DSP muestran la etapa

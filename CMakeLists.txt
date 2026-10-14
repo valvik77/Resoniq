@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(RESONIQ VERSION 0.2.11 LANGUAGES CXX)
+project(RESONIQ VERSION 0.2.12 LANGUAGES CXX)
 configure_file(apps/resoniq_version.h.in generated/resoniq_version.h @ONLY)
 option(RESONIQ_STATIC_RUNTIME "Use the static MSVC runtime for self-contained installers" OFF)
 if(MSVC AND RESONIQ_STATIC_RUNTIME)

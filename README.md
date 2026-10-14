@@ -66,6 +66,14 @@ perfil ajustado para un modelo conocido, una inferencia y un genérico. Los
 auriculares tienen prioridad. El reconocimiento por nombre y modelo no
 identifica con certeza todos los dispositivos externos conectados al portátil.
 
+En el primer arranque, sin sesión ni ajuste guardados, una instalación nueva
+en un modelo con perfil aprobado por escucha carga ese perfil completo de
+`profiles/` (controles, AGC y densidades), no solo su corrección de tono. La
+salida elegida en este equipo y el estado inicial del DSP no se toman del
+archivo. En un equipo solo inferido o no reconocido no se adopta: se mantiene
+la corrección detectada, porque el ajuste aprobado en otro portátil no es una
+aprobación para este. Después del primer arranque manda siempre la sesión.
+
 «Medir» pide permiso cada vez antes de usar el micrófono y vuelve a pedirlo antes
 de aplicar una propuesta. Reproduce ocho tonos y analiza la captura localmente.
 Un perfil aplicado se identifica como **Medido en este equipo** (`Measured`);

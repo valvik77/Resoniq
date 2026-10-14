@@ -33,8 +33,29 @@ Audio)», sin solaparse con «Entrada virtual». Build sin avisos y 17/17 CTest
 pasan. No se ejecutó MSI ni instalador, ni se tocaron perfiles, sesión ni
 favorito. README corregido: el instalador actual es el 0.2.11, no el 0.2.9.
 
-Siguen pendientes: favorito al primer arranque, VolCtl del cable, «Medir»
-sobre el perfil, el caso Conexant con audio real y la escucha del usuario.
+Segundo cambio de la sesión: perfil aprobado en el primer arranque. Una
+instalación nueva, sin sesión ni ajuste guardados, en un modelo con perfil
+aprobado por escucha (hoy solo el Lenovo 83LU, `Basis::Tuned`) carga entero
+`profiles/laptop-impact-plus.dps`, que es el favorito salvo nombre y
+`output_id`. Antes solo se aplicaba la corrección de tono y los controles
+seguían siendo los del preset (0.8/0.5/0.8/0.2), que nunca fueron aprobados.
+- `dps::approvedProfileFile` (hardware.hpp) relaciona nombre de dispositivo y
+  archivo distribuido; «Measured» y los nombres desconocidos dan vacío.
+- `dps::adoptDistributed` (profile.hpp) fija la regla de mezcla: el sonido es
+  el del archivo; la salida elegida aquí y el estado inicial del DSP, no.
+- En equipos inferidos o genéricos NO se adopta nada; se conserva la
+  corrección detectada. Tampoco cambia nada tras el primer arranque.
+Pruebas: reglas de mezcla en `tests/profiles.cpp`, tabla y nombres en
+`tests/hardware.cpp`, y en el autotest de la ventana que los seis perfiles
+distribuidos existen junto a la aplicación y que un equipo no ajustado no
+adopta ninguno. 17/17 CTest. LÍMITE: la rama que sí adopta no se pudo ejecutar
+aquí porque este equipo no es el modelo conocido; falta comprobarla en el
+Lenovo con una instalación nueva (o con LocalAppData\RESONIQ\config vacío).
+
+Siguen pendientes tras esta sesión: comprobar en el Lenovo la adopción del
+perfil aprobado al primer arranque, VolCtl del cable, «Medir» sobre el perfil,
+el caso Conexant con audio real y la escucha del usuario. Nada de esto se
+publica: 0.2.11 sigue siendo la versión distribuida y el MSI no se rehízo.
 
 ## Preparación de publicación 0.2.11 — 14 de octubre de 2026
 

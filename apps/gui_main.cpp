@@ -330,7 +330,7 @@ struct App {
         // like instead of a profile meant for a different laptop.
         if(!selfTest&&!audioTest&&profilePath.empty()&&requestedProfile.empty()) firstRun=true;
         refresh();sync();layout();
-        if(firstRun) applyDetected(true);
+        if(firstRun) {applyDetected(true);applyApprovedProfile();}
         std::filesystem::create_directories(root/L"build");
         if(!selfTest&&!audioTest) telemetry.open(root/L"build/gui-telemetry.log");
         if(telemetry&&!startupWarning.empty()) telemetry<<"startup_recovery="<<utf8(startupWarning)<<'\n';
@@ -702,6 +702,28 @@ struct App {
         if(announce) status=wide(suggestion.reason);
         sync();
         if(session.running()) {session.stop();ensureAudio();}
+        InvalidateRect(window,nullptr,FALSE);
+    }
+    // First run on a model whose profile was approved by listening: adopt that
+    // whole profile, not only its tone correction. A new installation used to
+    // start with the preset controls, which are not what was approved, and had
+    // no way of reaching the approved voicing without loading a file by hand.
+    // A machine that is merely inferred or unknown keeps the detected
+    // correction: another laptop's voicing is not an approval for this one.
+    void applyApprovedProfile() {
+        const auto suggestion=detectCalibration();
+        if(suggestion.basis!=dps::Suggestion::Basis::Tuned) return;
+        const auto file=dps::approvedProfileFile(suggestion.deviceName);
+        if(file.empty()) return;
+        const auto path=root/L"profiles"/wide(file);
+        if(!std::filesystem::exists(path)) return;
+        try {
+            profile=dps::adoptDistributed(dps::loadProfile(path),profile,prefs.dspAtStart!=0);sync();
+            status=L"Primer arranque: perfil aprobado «"+wide(profile.name)+L"» para este modelo.";
+        } catch(const std::exception& error) {
+            // The detected correction already applied stays in place.
+            if(telemetry) telemetry<<"approved_profile_error="<<error.what()<<'\n';
+        }
         InvalidateRect(window,nullptr,FALSE);
     }
     // Acoustic measurement. Nothing here touches the microphone until the user
@@ -1200,6 +1222,22 @@ struct App {
             prefs.virtualInputId="missing-input";refresh();
             if(!virtualId.empty()||SendMessageW(input,CB_GETCURSEL,0,0)!=CB_ERR) throw std::runtime_error("Missing virtual input substituted");
             prefs.virtualInputId=previousId;refresh();
+        }
+        // A first run adopts the distributed profile for the detected model,
+        // so this installation must actually carry those files beside it.
+        for(const auto* name:{"Laptop","Laptop Focus","Laptop Impact","Laptop Impact+","Headphones","External"}) {
+            const auto file=dps::approvedProfileFile(name);
+            const auto path=root/L"profiles"/wide(file);
+            if(file.empty()||!std::filesystem::exists(path)) throw std::runtime_error("Distributed profile missing from this installation");
+            if(dps::loadProfile(path).deviceName!=name) throw std::runtime_error("Distributed profile carries another device name");
+        }
+        // On a machine that is only inferred or unknown, the first-run
+        // adoption must leave the profile alone: another laptop's approved
+        // voicing is not an approval for this one.
+        if(detectCalibration().basis!=dps::Suggestion::Basis::Tuned) {
+            const auto before=profile;applyApprovedProfile();
+            if(profile.name!=before.name||profile.deviceName!=before.deviceName||profile.parameters.bass!=before.parameters.bass)
+                throw std::runtime_error("Untuned machine adopted a distributed profile");
         }
         SendMessageW(sliders[4],TBM_SETPOS,TRUE,37);publish();if(session.state.intensity.load()!=.37f) throw std::runtime_error("Slider did not reach audio state");
         SendMessageW(sliders[4],WM_KEYDOWN,VK_RIGHT,0);

@@ -22,4 +22,9 @@ struct Suggestion {
     std::string reason;          // short text for the user, in Spanish
 };
 Suggestion suggestCalibration(const Hardware& hardware);
+
+// The file under profiles/ that carries the whole approved profile for a
+// device name: controls, AGC and density as they were listened to, not only
+// the tone correction. Empty when nothing is distributed for that name.
+std::string approvedProfileFile(const std::string& deviceName);
 }

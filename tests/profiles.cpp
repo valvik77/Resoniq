@@ -97,6 +97,18 @@ int main() {
             try {(void)dps::loadProfile(path);} catch(const std::exception&) {rejected=true;}
             check(rejected,"Malformed legacy Gain value accepted");
         }
-        std::filesystem::remove(path);std::cout<<"PASS: 56 device/preset combinations, exact DSP roundtrip, locale independence, invalid and incomplete profiles\n";
+        // Adopting a distributed profile on a first run: the approved sound
+        // comes from the file, the endpoint and the DSP switch do not.
+        dps::Profile distributed;distributed.name="Portatil - impacto maximo";distributed.deviceName="Laptop Impact+";
+        distributed.outputId="not-this-machine";distributed.parameters.bass=.95f;distributed.parameters.enabled=true;
+        dps::Profile here;here.outputId="{this-machine-speaker}";here.parameters.bass=.3f;here.parameters.enabled=false;
+        auto adopted=dps::adoptDistributed(distributed,here,true);
+        check(adopted.outputId=="{this-machine-speaker}","Adopted profile moved the output to another machine");
+        check(adopted.parameters.bass==.95f&&adopted.name=="Portatil - impacto maximo","Adopted profile lost the approved sound");
+        check(!adopted.parameters.enabled,"Adopted profile ignored the start-up DSP preference");
+        adopted=dps::adoptDistributed(distributed,here,false);
+        check(adopted.parameters.enabled,"Adopted profile dropped its own DSP state without a preference");
+        check(adopted.outputId=="{this-machine-speaker}","Adopted profile moved the output without a preference");
+        std::filesystem::remove(path);std::cout<<"PASS: 56 device/preset combinations, exact DSP roundtrip, locale independence, invalid and incomplete profiles, first-run adoption\n";
     }catch(const std::exception& e) {std::filesystem::remove(path);std::cerr<<e.what()<<'\n';return 1;}
 }

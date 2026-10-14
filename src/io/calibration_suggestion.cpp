@@ -58,4 +58,16 @@ Suggestion suggestCalibration(const Hardware& hardware) {
     s.reason="Equipo no reconocido: ajuste neutro. Elige un perfil si no encaja.";
     return s;
 }
+std::string approvedProfileFile(const std::string& deviceName) {
+    struct Distributed { const char* device; const char* file; };
+    static constexpr std::array<Distributed,6> files{{
+        {"Laptop","laptop.dps"},{"Laptop Focus","laptop-focus.dps"},
+        {"Laptop Impact","laptop-impact.dps"},{"Laptop Impact+","laptop-impact-plus.dps"},
+        {"Headphones","headphones.dps"},{"External","external.dps"},
+    }};
+    for(const auto& f:files) if(deviceName==f.device) return f.file;
+    // "Measured" belongs to this machine's own measurement, and an unknown
+    // name has nothing distributed: in both cases there is no file to adopt.
+    return {};
+}
 }

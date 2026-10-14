@@ -1,5 +1,15 @@
 # Gain, indicadores y carácter entre equipos — 0.2.9
 
+> **Gain retirado en 0.2.10 por decisión del usuario (13 de octubre de 2026).**
+> Medido con Impact+ y señal sintética con bombo: la salida ya alcanza el techo
+> de -1 dBFS con Gain 0; +3 dB sube el nivel medio 0.5–1.3 dB y reduce el
+> contraste golpe/sostenido, y a +12 dB ese contraste casi desaparece. No hay
+> control, parámetro de motor ni telemetría de Gain. `gain_db` solo se acepta
+> al leer perfiles escritos por la 0.2.9 y se descarta: cargan a ganancia
+> unidad y no se vuelve a escribir. El texto sobre Gain que sigue es histórico;
+> lo relativo a indicadores y medición continúa vigente. En su lugar vuelve la
+> lectura «Detalle | Ataque» de los perfiles Focus e Impact.
+
 ## Hallazgos
 
 El usuario confirma que la medición funciona en Conexant, pero no percibe el
@@ -26,8 +36,9 @@ Dos errores de software contribuían a la confusión:
 El host publica processedPeak y dspGainDb antes de aplicar el volumen VB-CABLE.
 Actividad DSP usa ese pico y Realce DSP muestra la relación de picos del mismo
 bloque entre entrada y salida del motor. No es LUFS, RMS ni calidad percibida.
-Salida sigue mostrando el pico final tras el volumen aplicado por el host;
-el volumen/atenuación del hardware físico posterior también afecta la escucha.
+Salida sigue mostrando el pico final enviado al dispositivo físico, cuyo propio
+volumen también afecta la escucha. Desde 0.2.10 el volumen de VB-CABLE actúa
+antes del motor (ver VB-CABLE_VOLUME.md), de modo que Entrada ya lo incluye.
 Mute/cero mantienen los indicadores de salida en cero. Compresión aparece por
 separado, sin confundirla con el realce ni esconder el control Gain.
 

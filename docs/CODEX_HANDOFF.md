@@ -1,5 +1,27 @@
 # Traspaso a Codex — sesión del 12 de octubre de 2026
 
+> Último cierre, 14 de octubre: empezar por la primera sección de
+> PROJECT_MEMORY.md. Usuario percibe sonido de caja/distorsión con procesado;
+> diagnóstico pendiente. Instalada observada 0.2.11. Había sesión mixta
+> suave/Impact+; al guardar, sesión y favorito LocalAppData tienen hash
+> 5B437712…EC90 y AGC histórico. Favorito original del repo distinto: 5119695B….
+> No inferir aprobación auditiva ni sobrescribir referencias. Falta escuchar
+> el favorito y comparar ambas rutas en condiciones iguales si persiste.
+
+> Actualización del 14 de octubre: auditoría/refactorización local completadas.
+> Leer primero PROJECT_MEMORY.md y AUDIT_2026-10-14.md. 0.2.11 reconstruida,
+> sin publicar/instalar; 17 CTest, cierre aislado y MSI extraído pasan.
+> No caché de modo VB entre sesiones; medidas ambiguas/inestables se rechazan.
+> Favorito/sesión preservados; DSP visible sin igualación. Audio real pendiente.
+
+> Estado más reciente (13 de octubre, noche): 0.2.11 local sin publicar, tras la
+> auditoría de Claude y la comparación medida con Bongiovi. Leer primero las dos
+> secciones iniciales de PROJECT_MEMORY.md y VB-CABLE_VOLUME.md.
+>
+> Estado actual del 13 de octubre, versión 0.2.9 publicada e instalada:
+> leer [CLAUDE_HANDOFF_2026-10-13.md](CLAUDE_HANDOFF_2026-10-13.md) y el nuevo
+> punto de continuidad de PROJECT_MEMORY.md. El texto inferior es histórico.
+
 **Ensayo temporal nuevo:** `config/attack-body.user.dps`, favorito más acento
 corto `transient_accent_db 4`. Conserva EQ/densidad/AGC/RAW. Mejora técnica modesta
 de contraste, con pequeña pérdida relativa de cuerpo; escucha pendiente.

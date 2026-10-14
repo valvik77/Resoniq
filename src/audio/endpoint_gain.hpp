@@ -5,10 +5,13 @@
 #include <cstddef>
 
 namespace dps::detail {
-// VB-CABLE's hardware loopback is before its endpoint volume. Honour the
-// endpoint's actual dB curve after DSP; its scalar is an audio-taper control,
-// not a linear sample multiplier. Only the observer calls COM.
-class OutputVolume {
+// Follows a render endpoint's actual dB curve; its scalar is an audio-taper
+// control, not a linear sample multiplier. Used ahead of the DSP for a cable
+// whose loopback ignores the endpoint volume, so that Windows volume acts at
+// the same point as on transports that attenuate their own loopback: the
+// approved voicing was tuned with the volume in front of the engine.
+// Only the observer thread calls COM; apply() belongs to the audio thread.
+class EndpointGain {
     std::atomic<float> target_{1.f};
     float current_=1.f;
 public:

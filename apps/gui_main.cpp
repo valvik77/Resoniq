@@ -65,7 +65,7 @@ using Session=resoniq::ui::AudioSession;
 struct App {
     HWND window{},output{},input{},device{},preset{},toggle{},raw{};
     HWND hovered{};
-    std::array<HWND,6> sliders{};
+    std::array<HWND,5> sliders{};
     std::array<float,96> activity{};
     HFONT font{},titleFont{};
     HBRUSH cardBrush=CreateSolidBrush(theme.card);
@@ -82,8 +82,8 @@ struct App {
     ~App(){session.stop();DeleteObject(font);DeleteObject(titleFont);DeleteObject(cardBrush);}
     int scale(int n) const {return MulDiv(n,static_cast<int>(GetDpiForWindow(window)),96);}
     void paintChrome(HWND h,HDC dc) {
-        RECT r;GetClientRect(h,&r);const int id=GetDlgCtrlID(h);const bool slider=id>=Slider&&id<Slider+6;
-        auto base=CreateSolidBrush(slider&&id!=Slider+5?theme.card:theme.background);FillRect(dc,&r,base);DeleteObject(base);
+        RECT r;GetClientRect(h,&r);const int id=GetDlgCtrlID(h);const bool slider=id>=Slider&&id<Slider+5;
+        auto base=CreateSolidBrush(slider?theme.card:theme.background);FillRect(dc,&r,base);DeleteObject(base);
         const bool enabled=IsWindowEnabled(h)!=FALSE,hot=hovered==h,focused=GetFocus()==h;
         SetBkMode(dc,TRANSPARENT);SelectObject(dc,font);SetTextColor(dc,enabled?theme.text:theme.mutedText);
         if(slider) {
@@ -131,7 +131,7 @@ struct App {
         if(message==WM_MOUSELEAVE) {if(app->hovered==h) app->hovered=nullptr;InvalidateRect(h,nullptr,FALSE);}
         if(message==WM_SETFOCUS||message==WM_KILLFOCUS||message==WM_ENABLE) InvalidateRect(h,nullptr,FALSE);
         const int id=GetDlgCtrlID(h);
-        const bool chrome=id==Output||id==Input||id==Device||id==Preset||id==Raw||(id>=Slider&&id<Slider+6)||(id>=SetStart&&id<=SetTheme);
+        const bool chrome=id==Output||id==Input||id==Device||id==Preset||id==Raw||(id>=Slider&&id<Slider+5)||(id>=SetStart&&id<=SetTheme);
         if(chrome&&message==WM_PAINT) {
             // Draw into an off-screen bitmap first: repaints are frequent now
             // and painting straight to the window would flicker during drags.
@@ -186,7 +186,7 @@ struct App {
         // its own classic thumb, which leaked over the Fluent slider. Removing
         // the visual theme stops that drawing at the source instead of
         // repainting over it afterwards; keyboard and mouse logic are intact.
-        if(id>=Slider&&id<Slider+6) SetWindowTheme(h,L" ",L" ");
+        if(id>=Slider&&id<Slider+5) SetWindowTheme(h,L" ",L" ");
         // The dropped-down list is a window of its own; without stripping its
         // theme Windows frames it with a light border that we never draw.
         if(!lstrcmpiW(cls,WC_COMBOBOXW)) {
@@ -214,7 +214,6 @@ struct App {
     void sync() {
         const auto& p=profile.parameters;const std::array<float,5> values{p.bass,p.clarity,p.dynamics,p.spatial,p.intensity};
         for(std::size_t i=0;i<5;++i) SendMessageW(sliders[i],TBM_SETPOS,TRUE,static_cast<LPARAM>(std::lround(values[i]*100)));
-        SendMessageW(sliders[5],TBM_SETPOS,TRUE,static_cast<LPARAM>(std::lround(p.gainDb*2+24)));
         int d=7;for(int i=0;i<7;++i) if(profile.deviceName==devices[i]) d=i;SendMessageW(device,CB_SETCURSEL,d,0);
         for(int i=0;i<4;++i) if(profile.presetName==presets[i]||wide(profile.presetName)==presetLabels[i]) SendMessageW(preset,CB_SETCURSEL,i,0);
         SendMessageW(raw,BM_SETCHECK,profile.raw?BST_CHECKED:BST_UNCHECKED,0);
@@ -227,8 +226,6 @@ struct App {
         p.dynamics=static_cast<float>(SendMessageW(sliders[2],TBM_GETPOS,0,0))/100;
         p.spatial=static_cast<float>(SendMessageW(sliders[3],TBM_GETPOS,0,0))/100;
         p.intensity=static_cast<float>(SendMessageW(sliders[4],TBM_GETPOS,0,0))/100;
-        p.gainDb=(static_cast<float>(SendMessageW(sliders[5],TBM_GETPOS,0,0))-24)/2;
-        session.state.gainDb=p.gainDb;
         session.state.bass=p.bass;session.state.clarity=p.clarity;session.state.dynamics=p.dynamics;session.state.spatial=p.spatial;session.state.intensity=p.intensity;
         InvalidateRect(window,nullptr,FALSE);
     }
@@ -251,7 +248,6 @@ struct App {
         move(sliders[4],260,435,495,32);
         for(int i=0;i<4;++i) move(sliders[i],260,495+i*55,495,32);
         move(raw,30,806,420,28);
-        move(sliders[5],550,803,220,32);
         move(GetDlgItem(window,About),720,877,130,30);
     }
     void init() {
@@ -272,8 +268,6 @@ struct App {
         control(WC_BUTTONW,L"",BS_OWNERDRAW,Minimise);control(WC_BUTTONW,L"",BS_OWNERDRAW,Close);control(WC_BUTTONW,L"Sonido Windows",BS_OWNERDRAW|WS_TABSTOP,Route);
         raw=control(WC_BUTTONW,L"Omitir efectos adicionales de Windows",BS_AUTOCHECKBOX|WS_TABSTOP,Raw);
         for(int i=0;i<5;++i) {sliders[i]=control(TRACKBAR_CLASSW,L"",TBS_HORZ|TBS_NOTICKS|WS_TABSTOP,Slider+i);SendMessageW(sliders[i],TBM_SETRANGE,TRUE,MAKELPARAM(0,100));SendMessageW(sliders[i],TBM_SETPAGESIZE,0,10);}
-        sliders[5]=control(TRACKBAR_CLASSW,L"",TBS_HORZ|TBS_NOTICKS|WS_TABSTOP,Slider+5);
-        SendMessageW(sliders[5],TBM_SETRANGE,TRUE,MAKELPARAM(0,48));SendMessageW(sliders[5],TBM_SETPAGESIZE,0,2);
         wchar_t path[32768];const DWORD n=GetModuleFileNameW(nullptr,path,32768);if(!n||n==32768) throw std::runtime_error("No se pudo localizar la aplicacion");
         // Support nested build directories and a future installed layout.
         root=std::filesystem::path(path).parent_path();
@@ -1094,8 +1088,9 @@ struct App {
             box(600,765,static_cast<int>(250*amount),7,theme.warm);
             if(cut>.1f) {swprintf_s(number,L"Compresión: %.1f dB",cut);label(600,784,number,theme.mutedText);}
         }
-        label(490,810,L"Gain",theme.mutedText);
-        wchar_t gainLabel[32];swprintf_s(gainLabel,L"%+.1f dB",profile.parameters.gainDb);label(780,810,gainLabel,theme.accent);
+        if(profile.deviceName=="Laptop Focus"||profile.deviceName.rfind("Laptop Impact",0)==0) {
+            wchar_t value[128];swprintf_s(value,L"Detalle +%.1f dB | Ataque +%.1f dB",session.state.dynamicLiftDb.load(),session.state.transientLiftDb.load());label(490,806,value,theme.mutedText);
+        }
         label(30,855,status,theme.mutedText);
         label(30,887,L"Resoniq " RESONIQ_VERSION_WTEXT L"  /  Audio en tiempo real",theme.mutedText);
     }
@@ -1163,9 +1158,6 @@ struct App {
         DeleteObject(bmp);DeleteDC(mem);ReleaseDC(window,dc);if(!out) throw std::runtime_error("Screenshot write failed");
     }
     void test() {
-        SendMessageW(sliders[5],TBM_SETPOS,TRUE,36);publish();
-        if(session.state.gainDb.load()!=6.f) throw std::runtime_error("Gain slider did not reach audio state");
-        SendMessageW(sliders[5],TBM_SETPOS,TRUE,24);publish();
         if(!SendMessageW(window,WM_QUERYENDSESSION,0,ENDSESSION_CLOSEAPP))
             throw std::runtime_error("Restart Manager shutdown request rejected");
         SendMessageW(window,WM_ENDSESSION,FALSE,ENDSESSION_CLOSEAPP);
@@ -1390,7 +1382,7 @@ LRESULT CALLBACK procedure(HWND h,UINT message,WPARAM w,LPARAM l) {
                 }
                 if(a->telemetry) {
                 const auto& calibration=a->profile.parameters.device;
-                a->telemetry<<"device="<<a->profile.deviceName<<" gain_db="<<a->session.state.gainDb.load()
+                a->telemetry<<"device="<<a->profile.deviceName<<" cable_volume="<<a->session.state.cableVolume.load()
                     <<" processed_output="<<a->session.state.processedPeak.load()<<" dsp_gain_db="<<a->session.state.dspGainDb.load()
                     <<" highpass_hz="<<calibration.highpassHz<<" body_db="<<calibration.bodyDb<<" presence_db="<<calibration.presenceDb
                     <<" loud_density="<<calibration.loudDensity<<" band_density="<<calibration.bandDensity<<' ';

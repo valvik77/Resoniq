@@ -1,5 +1,9 @@
 #include "dps/profile.hpp"
+#include <algorithm>
+#include <array>
 #include <fstream>
+#include <iterator>
+#include <string>
 #include <iostream>
 #include <cmath>
 #include <stdexcept>
@@ -52,10 +56,47 @@ int main() {
         p.parameters.device=dps::deviceCalibration("Laptop");p.parameters.alignedIntensity=true;p.parameters.device.transientAccentDb=4;
         dps::saveProfile(path,p);check(dps::loadProfile(path).parameters.alignedIntensity,"Experimental intensity flag lost on save");
         check(dps::loadProfile(path).parameters.device.transientAccentDb==4,"Transient accent lost on save");
-        p.parameters.gainDb=6;dps::saveProfile(path,p);
-        check(dps::loadProfile(path).parameters.gainDb==6,"Gain lost during profile roundtrip");
-        p.parameters.gainDb=0;dps::saveProfile(path,p);
-        {std::ifstream input(path);const std::string bytes((std::istreambuf_iterator<char>(input)),{});check(bytes.find("gain_db")==std::string::npos,"Zero Gain rewrites legacy profile format");}
+        // The level control range is optional: absent means the historical
+        // 6 dB, and a profile that never set it is written back unchanged.
+        {
+            dps::saveProfile(path,p);
+            {std::ifstream saved(path);const std::string bytes((std::istreambuf_iterator<char>(saved)),{});check(bytes.find("agc_range_db")==std::string::npos,"Default level range rewrites legacy profile format");}
+            check(dps::loadProfile(path).parameters.agcRangeDb==6,"Legacy profile lost its level range");
+            auto fixed=p;fixed.parameters.agcRangeDb=0;dps::saveProfile(path,fixed);
+            check(dps::loadProfile(path).parameters.agcRangeDb==0,"Level range lost during profile roundtrip");
+            // With no range the level control cannot follow the input: a quiet and
+            // a loud copy of the same passage differ by exactly their own ratio.
+            std::array<float,9600> quiet{},loud{},a{},b{};
+            for(std::size_t i=0;i<4800;++i) {quiet[2*i]=quiet[2*i+1]=.02f*std::sin(static_cast<float>(i)*.09f);loud[2*i]=loud[2*i+1]=4*quiet[2*i];}
+            auto still=fixed.parameters;still.dynamics=0;still.device.detailDb=0;still.adaptive=false;still.device.harmonicGain=0;still.device.transientAccentDb=0;
+            dps::Engine first,second;first.prepare(48000,still);second.prepare(48000,still);
+            first.process(quiet.data(),a.data(),4800);second.process(loud.data(),b.data(),4800);
+            float worst=0;for(std::size_t i=4800;i<9600;++i) worst=std::max(worst,std::abs(b[i]-4*a[i]));
+            check(worst<1e-4f,"Fixed level range still follows the input level");
+            bool rejected=false;fixed.parameters.agcRangeDb=7;
+            try {dps::saveProfile(path,fixed);} catch(const std::invalid_argument&) {rejected=true;}
+            check(rejected,"Out-of-range level control accepted");
+            dps::saveProfile(path,p);
+        }
+        // Gain existed in 0.2.9 only. Its files must still load, sounding as
+        // the same profile without the field, and must not be written back.
+        {
+            dps::saveProfile(path,p);const auto plain=dps::loadProfile(path);
+            {std::ofstream appended(path,std::ios::app);appended<<"gain_db 12\n";}
+            const auto withdrawn=dps::loadProfile(path);
+            std::array<float,512> input{},a{},b{};
+            for(std::size_t i=0;i<256;++i) input[2*i]=input[2*i+1]=.2f*std::sin(static_cast<float>(i)*.07f);
+            dps::Engine first,second;first.prepare(48000,plain.parameters);second.prepare(48000,withdrawn.parameters);
+            first.process(input.data(),a.data(),256);second.process(input.data(),b.data(),256);
+            check(a==b,"Profile saved by 0.2.9 with Gain no longer loads at unity");
+            dps::saveProfile(path,withdrawn);
+            std::ifstream saved(path);const std::string bytes((std::istreambuf_iterator<char>(saved)),{});
+            check(bytes.find("gain_db")==std::string::npos,"Withdrawn Gain written back to a profile");
+            bool rejected=false;
+            {std::ofstream broken(path,std::ios::app);broken<<"gain_db loud\n";}
+            try {(void)dps::loadProfile(path);} catch(const std::exception&) {rejected=true;}
+            check(rejected,"Malformed legacy Gain value accepted");
+        }
         std::filesystem::remove(path);std::cout<<"PASS: 56 device/preset combinations, exact DSP roundtrip, locale independence, invalid and incomplete profiles\n";
     }catch(const std::exception& e) {std::filesystem::remove(path);std::cerr<<e.what()<<'\n';return 1;}
 }

@@ -1,4 +1,4 @@
-RESONIQ 0.2.9 - transporte VB-CABLE
+RESONIQ 0.2.11 - transporte VB-CABLE
 
 Al pulsar Finalizar tras instalar o actualizar, RESONIQ se abre automaticamente
 con permisos normales de usuario. El asistente VB-CABLE sigue siendo opcional.
@@ -9,10 +9,14 @@ El MSI activa automaticamente Windows Volume Control de VB-CABLE en su
 configuracion persistente. Si VB-CABLE ya estaba instalado, reinicia Windows
 para que su controlador vuelva a leer el ajuste. No reinicia automaticamente.
 
-RESONIQ 0.2.6 aplica tambien el volumen de CABLE Input despues del DSP,
-usando la curva en dB del dispositivo: su loopback entrega audio anterior
-al volumen incluso con Windows Volume Control activo. Esto corrige el salto
-de silencio en 0% a sonido al maximo en 2%. Mute y cero mantienen silencio.
+Desde 0.2.10 RESONIQ comprueba al abrir el audio si el cable ya entrega el
+sonido bajado segun el volumen de Windows. Si lo hace, no vuelve a bajarlo.
+Si el cable ignora el volumen (opcion inactiva o pendiente de reinicio),
+RESONIQ lo aplica el mismo con la curva en dB del dispositivo, antes del
+procesado. En ambos casos el volumen actua una sola vez y en el mismo punto
+que con el dispositivo propio. Mute y cero mantienen silencio.
+Con Windows Volume Control activo, el propio cable enmudece por debajo de
+un 6-8% aproximadamente y baja el nivel en escalones; es un limite suyo.
 
 Desde Inicio -> RESONIQ -> Instalar VB-CABLE puedes abrir el asistente que
 descarga, verifica y extrae el paquete oficial automaticamente. Tambien se

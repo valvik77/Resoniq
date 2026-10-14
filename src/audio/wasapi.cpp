@@ -1,7 +1,9 @@
 #include "dps/wasapi.hpp"
 #include "dps/stream_buffer.hpp"
 #include "endpoint_silence.hpp"
-#include "output_volume.hpp"
+#include "endpoint_gain.hpp"
+#include "cable_probe.hpp"
+#include "startup_gate.hpp"
 #include "dps/virtual_transport.hpp"
 #include "dps/measure.hpp"
 #include "capture_timeline.hpp"
@@ -47,16 +49,149 @@ struct Event {HANDLE handle=CreateEventW(nullptr,FALSE,FALSE,nullptr);Event(){if
 struct Priority {HANDLE handle=nullptr;Priority(){DWORD index=0;handle=AvSetMmThreadCharacteristicsW(L"Pro Audio",&index);}~Priority(){if(handle) AvRevertMmThreadCharacteristics(handle);}};
 struct Running {IAudioClient* client;bool started=false;void start(){require(client->Start(),"Start");started=true;}~Running(){if(started) client->Stop();}};
 ComPtr<IMMDeviceEnumerator> enumerator() {ComPtr<IMMDeviceEnumerator> e;require(CoCreateInstance(__uuidof(MMDeviceEnumerator),nullptr,CLSCTX_ALL,IID_PPV_ARGS(&e)),"Device enumerator");return e;}
+WAVEFORMATEX format() {WAVEFORMATEX f{};f.wFormatTag=WAVE_FORMAT_IEEE_FLOAT;f.nChannels=2;f.nSamplesPerSec=48000;f.wBitsPerSample=32;f.nBlockAlign=8;f.nAvgBytesPerSec=384000;return f;}
 class LoopbackSilence {
+    using Clock=std::chrono::steady_clock;
     ComPtr<IAudioEndpointVolume> volume_;
     ComPtr<detail::EndpointSilence> callback_;
-    detail::OutputVolume outputVolume_;
-    bool softwareVolume_=false;
+    detail::EndpointGain inputGain_;
+    detail::PilotMeter pilot_;
+    bool cable_=false;
+    detail::StartupGate startupGate_;
+    std::atomic<detail::CableVolume> mode_{detail::CableVolume::Unknown};
+    std::atomic<bool> ready_{false},hold_{false};
     std::atomic<bool> observerFailed_{false};
     std::jthread volumeWorker_;
+    // Until measured, attenuate: a cable that turns out to attenuate as well is
+    // merely quiet for a moment, whereas the opposite mistake plays at full level.
+    void publish(float level) noexcept {
+        inputGain_.setDb(mode_.load(std::memory_order_acquire)==detail::CableVolume::Attenuates?0.f:level);
+    }
+    // Observer thread; waits remain cancellable and keep following volume.
+    detail::CableVolume probe(IMMDevice* endpoint,IAudioEndpointVolume* volume,float level,const std::stop_token& stop) {
+        bool invalid=false;
+        const auto captureRevision=pilot_.revision();
+        const auto muteRevision=callback_->snapshot();
+        // Keep following Windows volume during every pilot wait. A volume or
+        // mute change invalidates this measurement even if it later returns.
+        const auto pause=[&](int milliseconds) {
+            const auto deadline=Clock::now()+std::chrono::milliseconds(milliseconds);
+            do {
+                if(stop.stop_requested()) {invalid=true;return false;}
+                float current=0;
+                require(volume->GetMasterVolumeLevel(&current),"Read volume during cable pilot");
+                publish(current);
+                if(callback_->silent()||callback_->snapshot()!=muteRevision||pilot_.revision()!=captureRevision||
+                   !std::isfinite(current)||std::abs(current-level)>.25f) {invalid=true;return false;}
+                if(Clock::now()>=deadline) return true;
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            } while(true);
+        };
+        const auto wait=[&](unsigned from,int milliseconds) {
+            const auto deadline=Clock::now()+std::chrono::milliseconds(milliseconds);
+            while(pilot_.windows()==from&&Clock::now()<deadline&&!stop.stop_requested())
+                if(!pause(10)) return false;
+            return !stop.stop_requested()&&pilot_.windows()!=from&&pause(0);
+        };
+        ComPtr<IAudioClient> player;
+        require(endpoint->Activate(__uuidof(IAudioClient),CLSCTX_ALL,nullptr,reinterpret_cast<void**>(player.GetAddressOf())),"Cable pilot");
+        const auto f=format();
+        require(player->Initialize(AUDCLNT_SHAREMODE_SHARED,AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM|AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,10000000,0,&f,nullptr),"Cable pilot stream");
+        ComPtr<IAudioRenderClient> writer;require(player->GetService(IID_PPV_ARGS(&writer)),"Cable pilot service");
+        // The pilot shares this process's session with the loopback capture; a
+        // per-application volume set in the Windows mixer scales what was sent.
+        ComPtr<ISimpleAudioVolume> session;require(player->GetService(IID_PPV_ARGS(&session)),"Cable pilot session");
+        float sessionVolume=1;BOOL sessionMuted=FALSE;
+        require(session->GetMasterVolume(&sessionVolume),"Cable pilot session volume");require(session->GetMute(&sessionMuted),"Cable pilot session mute");
+        if(sessionMuted||sessionVolume<.05f) return detail::CableVolume::Unknown;
+        UINT32 capacity=0;require(player->GetBufferSize(&capacity),"Cable pilot buffer");
+        const UINT32 frames=std::min<UINT32>(capacity,28800);
+        if(frames<24000) return detail::CableVolume::Unknown;
+        BYTE* data=nullptr;require(writer->GetBuffer(frames,&data),"Cable pilot data");
+        auto* samples=reinterpret_cast<float*>(data);
+        for(UINT32 i=0;i<frames;++i) {
+            const float fade=std::min({1.f,static_cast<float>(i)/240,static_cast<float>(frames-1-i)/240});
+            samples[2*i]=samples[2*i+1]=detail::pilotAmplitude*fade*static_cast<float>(std::sin(2*std::numbers::pi*detail::pilotHz*i/48000));
+        }
+        require(writer->ReleaseBuffer(frames,0),"Cable pilot release");
+        Running running{player.Get()};running.start();
+        // Let endpoint and capture latency pass, drop the window in progress,
+        // then read three whole windows from inside the 600 ms tone.
+        if(!pause(150)) return detail::CableVolume::Unknown;
+        unsigned seen=pilot_.windows();
+        if(!wait(seen,300)) return detail::CableVolume::Unknown;
+        std::array<float,3> heard{};
+        for(auto& value:heard) {
+            seen=pilot_.windows();
+            if(!wait(seen,300)) return detail::CableVolume::Unknown;
+            value=pilot_.amplitude();
+        }
+        std::sort(heard.begin(),heard.end());
+        // Programme energy at the pilot frequency, read once the tone has gone:
+        // before it, a session that has just opened still carries the capture
+        // start-up transient, which is not programme and vetoed clean readings.
+        // An idle endpoint delivers no loopback packets, hence no windows.
+        if(!pause(250)) return detail::CableVolume::Unknown;
+        float baseline=0;seen=pilot_.windows();
+        if(wait(seen,150)) for(unsigned i=0;i<2;++i) {
+            seen=pilot_.windows();
+            if(!wait(seen,150)) break;
+            baseline=std::max(baseline,pilot_.amplitude());
+        }
+        if(invalid||stop.stop_requested()) return detail::CableVolume::Unknown;
+        float finalSessionVolume=0;BOOL finalSessionMuted=FALSE;
+        require(session->GetMasterVolume(&finalSessionVolume),"Cable pilot final session volume");
+        require(session->GetMute(&finalSessionMuted),"Cable pilot final session mute");
+        if(finalSessionMuted||finalSessionVolume!=sessionVolume) return detail::CableVolume::Unknown;
+        float after=0;
+        if(FAILED(volume->GetMasterVolumeLevel(&after))||std::abs(after-level)>.25f) return detail::CableVolume::Unknown;
+        return detail::classifyPilot(heard[1],baseline,detail::pilotAmplitude*sessionVolume,level);
+    }
+    void observe(std::stop_token stop,const std::wstring& id) {
+        try {
+            Com observerCom;auto observerEnumerator=enumerator();ComPtr<IMMDevice> endpoint;
+            require(observerEnumerator->GetDevice(id.c_str(),&endpoint),"VB-CABLE volume observer");
+            ComPtr<IAudioEndpointVolume> volume;
+            require(endpoint->Activate(__uuidof(IAudioEndpointVolume),CLSCTX_ALL,nullptr,
+                reinterpret_cast<void**>(volume.GetAddressOf())),"VB-CABLE volume observer activation");
+            // VB-CABLE's own control takes about a second to settle on a new
+            // step; a session is assumed to open on a settled volume.
+            float stable=0;bool known=false;auto stableSince=Clock::now()-std::chrono::seconds(2);
+            auto nextProbe=Clock::now();Clock::time_point readyAt{};
+            unsigned attempts=0;bool measured=false,wasReady=false;
+            while(!stop.stop_requested()) {
+                float level=0;require(volume->GetMasterVolumeLevel(&level),"Read VB-CABLE volume dB");
+                auto now=Clock::now();
+                if(!known||level!=stable) {if(known) stableSince=now;stable=level;known=true;}
+                publish(level);
+                if(!wasReady&&ready_.load(std::memory_order_acquire)) {wasReady=true;readyAt=now;}
+                const bool measurable=detail::pilotRange(level)&&!callback_->silent();
+                if(!measured&&wasReady&&attempts<6&&now>=nextProbe&&measurable&&now-stableSince>=std::chrono::milliseconds(1500)) {
+                    ++attempts;
+                    auto result=detail::CableVolume::Unknown;
+                    // A failed pilot must not take the audio path down with it.
+                    try {result=probe(endpoint.Get(),volume.Get(),level,stop);} catch(const std::exception&) {}
+                    if(result!=detail::CableVolume::Unknown) {
+                        measured=true;mode_.store(result,std::memory_order_release);
+                        publish(level);
+                    }
+                    now=Clock::now();nextProbe=now+std::chrono::seconds(3);
+                }
+                // Never keep the output closed waiting for an answer.
+                if(hold_.load(std::memory_order_acquire)&&(measured||attempts||!measurable||
+                   (wasReady&&now-readyAt>std::chrono::milliseconds(1500)))) hold_.store(false,std::memory_order_release);
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+        } catch(...) {
+            inputGain_.setDb(-INFINITY);hold_.store(false,std::memory_order_release);
+            observerFailed_.store(true,std::memory_order_release);
+        }
+    }
 public:
     unsigned snapshot() const noexcept {return callback_?callback_->snapshot():0;}
     bool healthy() const noexcept {return !observerFailed_.load(std::memory_order_acquire);}
+    // 0 = not a cable; otherwise 1 + CableVolume, for telemetry.
+    int mode() const noexcept {return cable_?1+static_cast<int>(mode_.load(std::memory_order_acquire)):0;}
     void watch(IMMDeviceEnumerator* deviceEnumerator,const std::wstring& id) {
         ComPtr<IMMDevice> device;require(deviceEnumerator->GetDevice(id.c_str(),&device),"Loopback volume endpoint");
         require(device->Activate(__uuidof(IAudioEndpointVolume),CLSCTX_ALL,nullptr,
@@ -70,27 +205,16 @@ public:
             require(volume_->GetMute(&muted),"Read loopback mute");
             callback_->initialise(before,scalar,muted!=FALSE);
             for(const auto& endpoint:endpoints()) if(endpoint.id==id)
-                softwareVolume_=transportKind(endpoint)==TransportKind::VbCable;
-            if(softwareVolume_) {
+                cable_=transportKind(endpoint)==TransportKind::VbCable;
+            if(cable_) {
                 float db=0;require(volume_->GetMasterVolumeLevel(&db),"Read VB-CABLE volume curve");
-                outputVolume_.initialise(db);
-                volumeWorker_=std::jthread([this,id](std::stop_token stop) {
-                    try {
-                        Com observerCom;auto observerEnumerator=enumerator();ComPtr<IMMDevice> endpoint;
-                        require(observerEnumerator->GetDevice(id.c_str(),&endpoint),"VB-CABLE volume observer");
-                        ComPtr<IAudioEndpointVolume> volume;
-                        require(endpoint->Activate(__uuidof(IAudioEndpointVolume),CLSCTX_ALL,nullptr,
-                            reinterpret_cast<void**>(volume.GetAddressOf())),"VB-CABLE volume observer activation");
-                        while(!stop.stop_requested()) {
-                            float level=0;require(volume->GetMasterVolumeLevel(&level),"Read VB-CABLE volume dB");
-                            outputVolume_.setDb(level);
-                            std::this_thread::sleep_for(std::chrono::milliseconds(20));
-                        }
-                    } catch(...) {
-                        outputVolume_.setDb(-INFINITY);
-                        observerFailed_.store(true,std::memory_order_release);
-                    }
-                });
+                // Driver state and endpoint identity may change between sessions.
+                // Never borrow a decision from a previous audio route.
+                inputGain_.initialise(db);
+                // Every new session: stay silent for the fraction of a second the
+                // measurement takes, rather than open at a level to be corrected.
+                hold_.store(detail::pilotRange(db)&&!callback_->silent(),std::memory_order_release);
+                volumeWorker_=std::jthread([this,id](std::stop_token stop) {observe(stop,id);});
             }
         } catch(...) {
             volume_->UnregisterControlChangeNotify(callback_.Get());callback_.Reset();throw;
@@ -100,15 +224,20 @@ public:
         if(volumeWorker_.joinable()) {volumeWorker_.request_stop();volumeWorker_.join();}
         if(callback_) volume_->UnregisterControlChangeNotify(callback_.Get());
     }
+    // Audio thread from here on.
+    void started() noexcept {ready_.store(true,std::memory_order_release);}
+    void captured(float left,float right) noexcept {if(cable_) pilot_.push(left,right);}
+    void discontinuity() noexcept {if(cable_) pilot_.discontinuity();}
+    // Windows volume for a cable that ignores it, ahead of the DSP.
+    void preGain(float* samples,std::size_t frames) noexcept {if(cable_) inputGain_.apply(samples,frames);}
     bool apply(float* samples,std::size_t frames,float& peak) noexcept {
-        const bool silent=callback_&&callback_->apply(samples,frames);
-        if(softwareVolume_) peak=outputVolume_.apply(samples,frames);
-        else if(silent) peak=0;
-        return silent;
+        if(callback_&&callback_->apply(samples,frames)) {peak=0;return true;}
+        const bool held=hold_.load(std::memory_order_acquire);
+        peak=startupGate_.apply(samples,frames,held);
+        return held;
     }
 };
 ComPtr<IAudioClient> client(IMMDeviceEnumerator* e,const std::wstring& id) {ComPtr<IMMDevice> device;require(e->GetDevice(id.c_str(),&device),"GetDevice");ComPtr<IAudioClient> c;require(device->Activate(__uuidof(IAudioClient),CLSCTX_ALL,nullptr,reinterpret_cast<void**>(c.GetAddressOf())),"Activate audio");return c;}
-WAVEFORMATEX format() {WAVEFORMATEX f{};f.wFormatTag=WAVE_FORMAT_IEEE_FLOAT;f.nChannels=2;f.nSamplesPerSec=48000;f.wBitsPerSample=32;f.nBlockAlign=8;f.nAvgBytesPerSec=384000;return f;}
 void initialize(IAudioClient* c,HANDLE event,bool loopback,bool raw,AUDIO_STREAM_CATEGORY category=AudioCategory_Media) {
     if(raw) {ComPtr<IAudioClient2> c2;require(c->QueryInterface(IID_PPV_ARGS(&c2)),"AudioClient2");AudioClientProperties properties{};properties.cbSize=sizeof(properties);properties.eCategory=category;properties.Options=AUDCLNT_STREAMOPTIONS_RAW;require(c2->SetClientProperties(&properties),"Raw stream properties");}
     auto f=format();WAVEFORMATEX* mix=nullptr;require(c->GetMixFormat(&mix),"GetMixFormat");
@@ -166,10 +295,11 @@ void runWasapi(const LiveOptions& options,LiveState& state) {
     const float renderBufferMs=static_cast<float>(capacity)*1000.f/48000.f;
     BYTE* buffer=nullptr;require(writer->GetBuffer(capacity,&buffer),"Prime buffer");require(writer->ReleaseBuffer(capacity,AUDCLNT_BUFFERFLAGS_SILENT),"Prime release");
     Running renderRun{render.Get()},captureRun{capture.Get()};Priority priority;
-    if(capture) captureRun.start();renderRun.start();
+    if(capture) captureRun.start();renderRun.start();silence.started();
     bool primed=options.tone;double phase=0;float fade=0;
     auto volumeRevision=silence.snapshot();
     auto lastRender=std::chrono::steady_clock::now();
+    bool captureStarted=false;
     HANDLE events[]{renderEvent.handle,captureEvent.handle};
     while(!state.stop.load(std::memory_order_relaxed)) {
         if(!silence.healthy()) throw std::runtime_error("No se pudo leer el volumen de VB-CABLE; reconectando audio");
@@ -186,9 +316,13 @@ void runWasapi(const LiveOptions& options,LiveState& state) {
             // Limit work per wakeup: avoid starving render under unexpected backlog.
             for(unsigned packets=0;packet&&packets<64;++packets) {
                 BYTE* source=nullptr;UINT32 frames=0;DWORD flags=0;require(reader->GetBuffer(&source,&frames,&flags,nullptr,nullptr),"Capture buffer");
-                if(flags&AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) {state.discontinuities.fetch_add(1,std::memory_order_relaxed);fifo.reset();primed=false;fade=0;}
+                // The first packet after Start carries the discontinuity flag as a
+                // start marker; it says nothing about a measurement already under
+                // way, which it used to void on almost every first attempt.
+                if(flags&AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) {state.discontinuities.fetch_add(1,std::memory_order_relaxed);if(captureStarted) silence.discontinuity();fifo.reset();primed=false;fade=0;}
+                captureStarted=true;
                 const auto* samples=reinterpret_cast<const float*>(source);bool dropped=false;
-                for(UINT32 i=0;i<frames;++i) {float l=0,r=0;if(!(flags&AUDCLNT_BUFFERFLAGS_SILENT)) {l=samples[2*i];r=samples[2*i+1];if(!std::isfinite(l)) l=0;if(!std::isfinite(r)) r=0;}if(!fifo.push(l,r)) dropped=true;}
+                for(UINT32 i=0;i<frames;++i) {float l=0,r=0;if(!(flags&AUDCLNT_BUFFERFLAGS_SILENT)) {l=samples[2*i];r=samples[2*i+1];if(!std::isfinite(l)) l=0;if(!std::isfinite(r)) r=0;}silence.captured(l,r);if(!fifo.push(l,r)) dropped=true;}
                 require(reader->ReleaseBuffer(frames),"Capture release");if(dropped) {state.overflows.fetch_add(1,std::memory_order_relaxed);fifo.reset();primed=false;fade=0;}
                 require(reader->GetNextPacketSize(&packet),"Next packet");
             }
@@ -204,11 +338,12 @@ void runWasapi(const LiveOptions& options,LiveState& state) {
             block[2*i]=l*fade;block[2*i+1]=r*fade;
         }
         if(underrun) state.underruns.fetch_add(1,std::memory_order_relaxed);
+        silence.preGain(block.data(),available);
         engine.setControls(state.bass.load(std::memory_order_relaxed),state.clarity.load(std::memory_order_relaxed),state.dynamics.load(std::memory_order_relaxed),state.spatial.load(std::memory_order_relaxed));
-        engine.setEnabled(state.enabled.load(std::memory_order_relaxed));engine.setIntensity(state.intensity.load(std::memory_order_relaxed));engine.setGainDb(state.gainDb.load(std::memory_order_relaxed));engine.process(block.data(),block.data(),available);
+        engine.setEnabled(state.enabled.load(std::memory_order_relaxed));engine.setIntensity(state.intensity.load(std::memory_order_relaxed));engine.process(block.data(),block.data(),available);
         require(writer->GetBuffer(available,&buffer),"Render buffer");
         std::copy_n(block.data(),std::size_t(available)*2,reinterpret_cast<float*>(buffer));
-        float outputPeak=engine.meters().outputPeak;
+        float outputPeak=0;
         const bool silenced=silence.apply(reinterpret_cast<float*>(buffer),available,outputPeak);
         require(writer->ReleaseBuffer(available,silenced?AUDCLNT_BUFFERFLAGS_SILENT:0),"Render release");
         lastRender=std::chrono::steady_clock::now();
@@ -216,7 +351,7 @@ void runWasapi(const LiveOptions& options,LiveState& state) {
         state.processedPeak.store(silenced?0.f:dspMeters.outputPeak,std::memory_order_relaxed);
         state.dspGainDb.store(!silenced&&dspMeters.inputPeak>1e-4f&&dspMeters.outputPeak>1e-4f?
             20*std::log10(dspMeters.outputPeak/dspMeters.inputPeak):0.f,std::memory_order_relaxed);
-        const auto meters=engine.meters();state.transientLiftDb.store(meters.transientLiftDb,std::memory_order_relaxed);state.dynamicLiftDb.store(meters.dynamicLiftDb,std::memory_order_relaxed);state.inputPeak.store(meters.inputPeak,std::memory_order_relaxed);state.outputPeak.store(outputPeak,std::memory_order_relaxed);state.reduction.store(meters.gainReductionDb,std::memory_order_relaxed);state.enhancement.store(meters.enhancement,std::memory_order_relaxed);state.queued.store(static_cast<unsigned>(fifo.size()),std::memory_order_relaxed);
+        const auto meters=engine.meters();state.transientLiftDb.store(meters.transientLiftDb,std::memory_order_relaxed);state.dynamicLiftDb.store(meters.dynamicLiftDb,std::memory_order_relaxed);state.inputPeak.store(meters.inputPeak,std::memory_order_relaxed);state.outputPeak.store(outputPeak,std::memory_order_relaxed);state.reduction.store(meters.gainReductionDb,std::memory_order_relaxed);state.enhancement.store(meters.enhancement,std::memory_order_relaxed);state.queued.store(static_cast<unsigned>(fifo.size()),std::memory_order_relaxed);state.cableVolume.store(silence.mode(),std::memory_order_relaxed);
         state.latencyMs.store(endpointMs+renderBufferMs+static_cast<float>(fifo.size())*1000.f/48000.f,std::memory_order_relaxed);
     }
 }

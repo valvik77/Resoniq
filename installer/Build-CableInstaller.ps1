@@ -13,7 +13,7 @@ $taskFiles=@{
  'Install-VBCABLE.cmd'=Join-Path $PSScriptRoot 'Install-VBCABLE.cmd'
  'resoniq.ico'=Join-Path $taskRoot 'assets/brand/resoniq-app.ico'
 }
-foreach($taskName in @('external.dps','headphones.dps','laptop.dps','laptop-focus.dps','laptop-impact.dps','laptop-impact-plus.dps')){$taskFiles['profiles/'+$taskName]=Join-Path $taskRoot ('profiles/'+$taskName)}
+foreach($taskName in @('external.dps','headphones.dps','laptop.dps','laptop-focus.dps','laptop-impact.dps','laptop-impact-plus.dps','laptop-soft.dps')){$taskFiles['profiles/'+$taskName]=Join-Path $taskRoot ('profiles/'+$taskName)}
 $taskProduct=[xml](Get-Content (Join-Path $PSScriptRoot 'CableProduct.wxs') -Raw)
 $taskVersion=$taskProduct.Wix.Package.Version
 if([Diagnostics.FileVersionInfo]::GetVersionInfo($taskFiles['resoniq.exe']).ProductVersion -ne $taskVersion){throw 'La version de la aplicacion no coincide con la del MSI. Recompila antes de empaquetar.'}

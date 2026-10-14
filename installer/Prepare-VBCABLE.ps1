@@ -117,7 +117,9 @@ $taskTimer.Add_Tick({
 $taskInstall.Add_Click({
     try {
         $taskInstall.Enabled=$false
-        if(-not $PreparePreview -and (Find-CableDevice).Count -gt 0){
+        # A function unrolls a one-element array, and a lone CimInstance has no
+        # Count in Windows PowerShell 5.1: without @() an installed cable is missed.
+        if(-not $PreparePreview -and @(Find-CableDevice).Count -gt 0){
             $taskStatus.Text='Windows ya detecta VB-CABLE. No se abre su instalador para evitar retirarlo. Selecciona CABLE Input en RESONIQ; reinicia si acabas de instalarlo.'
             $taskInstall.Enabled=$true;return
         }

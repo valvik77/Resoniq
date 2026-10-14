@@ -1,0 +1,31 @@
+version 2
+name "Portatil - suave"
+device "Laptop"
+preset "RESONIQ Natural"
+output_id ""
+raw 1
+enabled 1
+adaptive 1
+bass 0.5
+clarity 0.5
+dynamics 0.2
+spatial 0.2
+intensity 1
+agc_attack_ms 100
+agc_release_ms 1500
+highpass_hz 70
+body_hz 160
+body_db 4
+presence_hz 3200
+presence_db 4
+harmonic_gain 0.7
+stereo_amount 0.4
+mud_hz 500
+mud_db -1.5
+detail_db 2
+harmonic_focus 0.3
+body_floor 0.5
+adaptive_depth 0.3
+loud_density 1
+band_density 1
+agc_range_db 0

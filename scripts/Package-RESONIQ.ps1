@@ -20,7 +20,7 @@ $taskFiles=@{
     'scripts/Create-Shortcut.ps1'=Join-Path $taskRoot 'scripts/Create-Shortcut.ps1'
     'scripts/Verify-Portable.ps1'=Join-Path $taskRoot 'scripts/Verify-Portable.ps1'
 }
-foreach($taskProfile in @('external.dps','headphones.dps','laptop.dps','laptop-focus.dps','laptop-impact.dps','laptop-impact-plus.dps')) {
+foreach($taskProfile in @('external.dps','headphones.dps','laptop.dps','laptop-focus.dps','laptop-impact.dps','laptop-impact-plus.dps','laptop-soft.dps')) {
     $taskFiles['profiles/'+$taskProfile]=Join-Path $taskRoot ('profiles/'+$taskProfile)
 }
 foreach($taskEntry in $taskFiles.GetEnumerator()) {Copy-Item -LiteralPath $taskEntry.Value -Destination (Join-Path $taskStage $taskEntry.Key)}

@@ -16,8 +16,13 @@ if($Cable) {
     if($taskVolume.Bitness -ne 'always64' -or $taskVolume.Permanent -ne 'yes' -or $taskValue.Root -ne 'HKLM' -or $taskValue.Key -ne 'SOFTWARE\VB-Audio\Cable' -or $taskValue.Name -ne 'VBAudioCableWDM_VolCtl' -or $taskValue.Type -ne 'integer' -or $taskValue.Value -ne '1'){throw 'VB Windows volume configuration missing or invalid'}
     if(-not $taskXml.SelectSingleNode('//w:Feature[@Id="Application"]/w:ComponentRef[@Id="CableWindowsVolume"]',$taskManager)){throw 'VB volume configuration is not installed'}
     foreach($taskAction in $taskXml.SelectNodes('//w:CustomAction',$taskManager)) {
-        if($taskAction.Id -notin @('LaunchInstructions','LaunchApplication','CloseRunningResoniq')){throw 'Cable MSI runs custom driver actions'}
+        if($taskAction.Id -notin @('LaunchInstructions','LaunchApplication','CloseRunningResoniq','SetWIXUI_EXITDIALOGOPTIONALCHECKBOX')){throw 'Cable MSI runs custom driver actions'}
     }
+    # An upgrade must not offer the VB-CABLE installer by default: it only clears the checkbox property, in the UI sequence.
+    $taskUncheck=$taskXml.SelectSingleNode('//w:CustomAction[@Id="SetWIXUI_EXITDIALOGOPTIONALCHECKBOX"]',$taskManager)
+    if($taskUncheck.Property -ne 'WIXUI_EXITDIALOGOPTIONALCHECKBOX' -or $taskUncheck.Value -ne '{}' -or $taskUncheck.DllEntry -or $taskUncheck.ExeCommand){throw 'Upgrade checkbox action is not a plain property reset'}
+    $taskUncheckSequence=$taskXml.SelectSingleNode('//w:InstallUISequence/w:Custom[@Action="SetWIXUI_EXITDIALOGOPTIONALCHECKBOX"]',$taskManager)
+    if($taskUncheckSequence.Condition -ne 'WIX_UPGRADE_DETECTED' -or $taskXml.SelectSingleNode('//w:InstallExecuteSequence/w:Custom[@Action="SetWIXUI_EXITDIALOGOPTIONALCHECKBOX"]',$taskManager)){throw 'Upgrade checkbox reset is missing, unconditional or outside the UI sequence'}
     if($taskXml.SelectSingleNode('//w:InstallExecuteSequence/w:Custom[@Action="LaunchInstructions"]',$taskManager)){throw 'Instructions run as an install transaction action'}
     if($taskXml.SelectSingleNode('//w:InstallExecuteSequence/w:Custom[@Action="LaunchApplication"]',$taskManager)){throw 'Application starts inside the install transaction'}
     $taskCloseAction=$taskXml.SelectSingleNode('//w:CustomAction[@Id="CloseRunningResoniq"]',$taskManager)

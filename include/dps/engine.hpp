@@ -35,7 +35,11 @@ struct Parameters {
     bool adaptive=true;
     DeviceCalibration device{};
     bool alignedIntensity=false; // experimental; legacy profiles keep their mix
-    float gainDb=0; // optional gain on processed audio, before the final limiter
+    // How far the level control may move the processed signal either way.
+    // 6 dB is the historical range (0.5x to 2x) and keeps approved profiles
+    // exact. Zero disables AGC gain movement; EQ, compression, harmonics and
+    // the limiter can still change loudness. This is not volume matching.
+    float agcRangeDb=6;
 };
 Parameters preset(std::string_view name);
 struct Meters { float inputPeak=0, outputPeak=0, gainReductionDb=0, enhancement=1,comparisonDryDb=0,comparisonWetDb=0,dynamicLiftDb=0,transientLiftDb=0; bool comparisonReady=false; };
@@ -61,11 +65,10 @@ class Engine {
     Parameters parameters_{};
     double rate_=48000;
     float attack_=0,release_=0,agcAttack_=0,agcRelease_=0;
-    float agcEnvelope_=0,agcGain_=1,limiterGain_=1,mix_=1;
+    float agcEnvelope_=0,agcGain_=1,limiterGain_=1,mix_=1,agcFloor_=.5f,agcCeiling_=2;
     float bassEnvelope_=0,bassAttack_=0,bassRelease_=0;
     std::array<float,4> controls_{.3f,.25f,.3f,.15f};
     float controlSmoothing_=0,mixCoefficient_=0;
-    float gainAmplitude_=1,gainTarget_=1;
     float levelEnvelope_=0,levelAttack_=0,levelRelease_=0,enhancement_=1;
     float comparisonDryEnergy_=0,comparisonWetEnergy_=0,comparisonDryGain_=1,comparisonWetGain_=1,comparisonDryTarget_=1,comparisonWetTarget_=1;
     float comparisonDryLimiter_=1,comparisonWetLimiter_=1,comparisonIntensity_=1,comparisonBlend_=1,comparisonMix_=0,comparisonCoefficient_=0;
@@ -82,7 +85,6 @@ public:
     // Audio thread only; smooth bypass/intensity, no allocation or locking.
     void setEnabled(bool enabled) noexcept { parameters_.enabled=enabled; }
     void setIntensity(float value) noexcept;
-    void setGainDb(float db) noexcept;
     void setComparison(bool enabled) noexcept;
     void setControls(float bass,float clarity,float dynamics,float spatial) noexcept;
     void process(const float* input, float* output, std::size_t frames) noexcept;

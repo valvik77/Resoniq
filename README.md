@@ -2,7 +2,7 @@
 
 ![Icono de RESONIQ](assets/brand/resoniq-app-128.png)
 
-[Descargar el instalador 0.2.9 para Windows x64](https://github.com/valvik77/Resoniq/releases/tag/v0.2.9).
+[Descargar el instalador 0.2.11 para Windows x64](https://github.com/valvik77/Resoniq/releases/tag/v0.2.11).
 Instala RESONIQ y usa el asistente de VB-CABLE incluido al finalizar.
 El instalador activa el control de volumen de Windows del cable. Tras instalar
 VB-CABLE, reinicia Windows y selecciona CABLE Input como salida de Windows
@@ -123,9 +123,9 @@ reinicio manual. Si el dispositivo existe, evita abrir el instalador de nuevo.
 El MSI activa el ajuste persistente Windows Volume Control de VB-CABLE;
 un cable ya instalado requiere reiniciar Windows para leer esa configuración.
 La versión 0.2.6 añade el banner «Resoniq by Valvik», «Acerca de» con versión
-y créditos, y aplica el volumen de VB-CABLE después del DSP siguiendo la curva
-en dB del endpoint. Su loopback está antes del volumen del controlador; activar
-el ajuste de registro por sí solo no corrige esa ruta de captura.
+y créditos. Desde la 0.2.10 el volumen de Windows del cable actúa una sola vez
+y antes del DSP: el host mide con un tono piloto breve si el cable ya atenúa su
+loopback y solo aplica él la curva en dB del endpoint cuando el cable la ignora.
 Validación y límites en [VB-CABLE_VOLUME.md](docs/VB-CABLE_VOLUME.md).
 La versión 0.2.7 abre RESONIQ al pulsar Finalizar en el asistente de instalación
 o actualización, con permisos normales de usuario. Ajusta los créditos de Acerca
@@ -137,9 +137,10 @@ archivos en uso, incluyendo versiones anteriores que se ocultan al recibir Cerra
 La GUI responde además al cierre de Restart Manager. Se guarda la sesión y se
 detiene el audio; el instalador vuelve a abrir RESONIQ al finalizar.
 Ver [INSTALLER_SHUTDOWN.md](docs/INSTALLER_SHUTDOWN.md).
-La 0.2.9 añade Gain de -12 a +12 dB (0 por defecto), antes del limitador y
-aplicado al audio procesado. Actividad DSP y Realce DSP muestran la etapa
-anterior al volumen de salida; el medidor Salida conserva el nivel final.
+La 0.2.9 añadió un control Gain que la 0.2.10 retira: con el perfil ya en el
+techo del limitador solo reducía el contraste de los golpes. Los perfiles que
+lo guardaron se siguen cargando, sin él. Actividad DSP y Realce DSP muestran la etapa
+del motor; el medidor Salida muestra lo que se envía al dispositivo físico.
 La medición ajusta el tono conservando densidad, adaptación, ataques y demás
 ajustes musicales del perfil elegido. Ver [GAIN_AND_METERS.md](docs/GAIN_AND_METERS.md).
 Identidad «Pulso continuo» y variantes en [assets/brand](assets/brand/README.md):

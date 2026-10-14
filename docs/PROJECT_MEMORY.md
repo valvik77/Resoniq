@@ -1,5 +1,272 @@
 # Memoria del proyecto
 
+## Preparación de publicación 0.2.11 — 14 de octubre de 2026
+
+El usuario autoriza explícitamente commit, push y release de los cambios
+0.2.10–0.2.11. Los estados «sin publicar» inferiores describen sus respectivas
+sesiones históricas. Se actualiza el enlace de descarga a v0.2.11.
+Comparación SHA256: los 16 archivos instalados en `C:/Program Files/RESONIQ`
+son idénticos al MSI local `dist/RESONIQ-Setup-0.2.11-x64-VBCABLE.msi`,
+incluidos ejecutable, perfiles y asistente. El proceso abierto usa esa instalación.
+No se reinstala ni se altera audio, sesión o favorito durante la publicación.
+La queja de sonido y las comprobaciones pendientes siguen abiertas; publicar
+no demuestra una mejora auditiva ni valida el caso Conexant que ignora volumen.
+Validación para esta publicación: build completo en `build/local-release`,
+17/17 CTest y `test_installer.ps1 -Cable -SkipAudioTest` pasan.
+Favorito del repositorio conserva SHA256 `5119695B...C3E23E`.
+MSI SHA256: `6CAABE17A1C68A88FEDC2EB5A7D8A8975C47CF5EF9FA94BDEF9525600206E62A`.
+
+## Cierre solicitado: sonido percibido y favorito — 14 de octubre de 2026
+
+Usuario pide guardar el estado. Refiere que con VB-CABLE/RESONIQ el sonido
+parece «en una caja», sube de volumen y parece distorsionar; Realtek directo
+suena más limpio y hace dos días todo sonaba mejor. No dar por resuelta esta
+queja por pasar pruebas ni atribuirla al cable sin comprobar el caso actual.
+
+Lectura de instalación: `C:/Program Files/RESONIQ/resoniq.exe` versión 0.2.11.
+Esto sustituye el «sin instalar» de los puntos anteriores respecto al estado
+observado actual; Codex no ejecutó la instalación en esta conversación.
+
+Durante el diagnóstico, la sesión LocalAppData se llamaba «Portatil - suave»
+pero contenía EQ/densidad de Impact+ y `agc_range_db 0`; posteriormente tenía
+controles Max (.8/.5/.8/.2). Era un ajuste mixto, distinto del favorito, no
+el perfil distribuido `profiles/laptop-soft.dps`. El nombre del perfil no
+garantiza que sus parámetros originales sigan intactos tras editarlo.
+Con DSP activo, últimas muestras consultadas: aumento del pico 6–12 dB,
+reducción dinámica hasta unos 6 dB y una salida exactamente en el techo
+0.891251. Son picos/medidores de bloques, no RMS ni prueba de distorsión
+acústica. En bypass, entrada/salida casi iguales; `cable_volume=2` en ambos.
+La medida previa entre transportes (<=0.4 dB por banda) reduce la sospecha
+sobre VB-CABLE, pero no descarta una regresión en las condiciones actuales.
+
+Se explicó «Original»: DSP desactivado manteniendo cable/host/altavoces,
+control de volumen y puerta de silencio. No equivale a Realtek directo.
+Se indicó dónde recuperar «Ajuste por defecto» y dónde viven sus archivos.
+Codex NO cargó ni sobrescribió perfiles, ni cambió audio/volumen.
+
+AL GUARDAR ESTE CIERRE, una nueva lectura muestra sesión LocalAppData idéntica
+al favorito LocalAppData: nombre «Referencia - Portatil impacto», Impact+,
+controles .95/.9/.85/.3, AGC 60/900 ms, sin `agc_range_db` (6 histórico).
+Ambos hash SHA256:
+`5B437712D8E450CAE99F6BB037E8A68388F37F34B4C0012FBEFDFF3AA513EC90`.
+Esto indica igualdad de los archivos guardados; no demuestra por sí solo el
+perfil activo en RAM ni que el usuario haya aprobado nuevamente el sonido.
+La copia original `config/favorite.user.dps` sigue siendo otra referencia:
+`5119695BA5D42074679AB8293F12FC44047126F19275C75DAEB57CEA82C3E23E`.
+No igualar estos favoritos automáticamente ni sustituir una sesión distinta.
+
+Pendiente: conocer la escucha tras recuperar el favorito y, si persiste la
+queja, comparar VB-CABLE/driver propio con el MISMO perfil y volúmenes
+controlados, conservando la configuración. No se hizo esa comparación nueva.
+No micrófono ni audio guardado en este diagnóstico. Conservar favorito,
+Gain retirado y comparación visible DSP activado/desactivado sin compensación.
+Estado de código/MSI: cambios locales sin nuevo commit, push ni publicación
+por Codex. Auditoría y correcciones posteriores de Claude descritas abajo.
+
+## Punto de continuidad — 14 de octubre de 2026
+
+Estado: 0.2.11 local, SIN commit, push ni release; MSI
+dist/RESONIQ-Setup-0.2.11-x64-VBCABLE.msi reconstruido con todo lo siguiente.
+Codex auditó 0.2.10–0.2.11 (docs/AUDIT_2026-10-14.md) y corrigió: volumen
+seguido durante el piloto, sin caché de resultado entre sesiones, medidas
+anuladas por mute/volumen/cortes, historia FIFO al llenarse, StartupGate.
+Claude verificó en VB-CABLE real (Lenovo) y corrigió dos regresiones: margen
+de «el cable atenúa» de -5/+3 dB (escalón de 8 %: -42.1 frente a -38.08) y la
+marca DATA_DISCONTINUITY del primer paquete tras Start ya no anula la medida.
+Resultado real: 8–50 % decididos al primer intento, una sola atenuación;
+agudos planos (0.0 dB hasta 14 kHz) con procesado apagado. 17 CTest y
+test_installer -Cable -SkipAudioTest pasan. Detalle al final del informe.
+
+Siguiente: el usuario instala 0.2.11 y escucha «Portátil - suave» frente a
+directo (y Bongiovi si lo reinstala), a igual volumen. Pendientes: volumen de
+altavoces visible en la ventana, favorito al primer arranque, VolCtl del
+cable, Medir sobre el perfil, caso «cable ignora volumen» en el Conexant.
+
+## Revisión de cambios posteriores de Claude — 14 de octubre de 2026
+
+Leer la última sección de `docs/AUDIT_2026-10-14.md`. Claude corrigió dos
+problemas descubiertos al comprobar el Lenovo: margen del piloto insuficiente
+al 8 % y marca inicial DATA_DISCONTINUITY que anulaba el primer intento.
+Código actual: atenuación entre -5/+3 dB respecto a lo pedido, límites
+excluidos; volumen ignorado a menos de 3 dB de 0. La marca del primer paquete
+no invalida el piloto; las posteriores sí, y todas conservan su contador.
+
+Claude comunicó detección al primer intento al 8–50 %, arranque/cambio de volumen
+y cadena tonal hasta 14 kHz; 17 CTest y MSI extraído pasan en su sesión.
+Codex revisó código/documentación: build actual y dos pruebas relevantes pasan,
+sin repetir audio real ni MSI. Informe y VB-CABLE_VOLUME sincronizados.
+Conexant y la banda 16–20 kHz en la cadena real siguen pendientes. No cambios
+de código, favorito, sesión ni publicación en esta revisión documental.
+
+## Auditoría y refactorización de Codex — 14 de octubre de 2026
+
+Informe: `docs/AUDIT_2026-10-14.md`. Sigue siendo 0.2.11 local sin commit,
+push ni publicación. MSI reconstruido, sin instalarlo; copia anterior en
+`build/audit-20261014/RESONIQ-Setup-0.2.11-before-audit.msi`.
+
+Corregidos: seguimiento del volumen durante el piloto; caché global de modo
+del cable retirada (se mide por sesión); clasificación ambigua; invalidación
+por cambios observados de volumen/mute y discontinuidad; historia FIFO
+sobrescrita al llenarse; pico final de rampa. Refactorización: StartupGate
+independiente de COM y publicación atómica conjunta del nivel/ventana del piloto.
+
+Build sin avisos, 17 CTest pasan, dos defectos reproducidos antes/después,
+cierre legacy/Restart Manager con copias aisladas pasa. MSI extraído pasa con
+`-Cable -SkipAudioTest`. Favorito y sesión conservados en ambas ubicaciones.
+No micrófono, cambios de volumen del equipo, instalación ni audio real nuevo.
+
+Cada sesión empieza conservadora: puede haber una pausa breve al reconectar.
+Si el modo sigue desconocido, un cable que ya atenúa puede permanecer más bajo;
+ver límites del informe. Falta probar ruta real corregida/Conexant y escuchar.
+DSP y perfiles sin cambios de algoritmo/valores durante esta auditoría.
+Gain retirado; comparación visible DSP activado/desactivado sin compensación.
+NO recuperar igualación de volumen: la propuesta de la sección histórica
+inferior está sustituida por `AGENTS.md`. Perfil suave no aprobado.
+
+## Comparación real con Bongiovi y versión 0.2.11 local — 13 de octubre de 2026 (noche)
+
+Estado: árbol de trabajo SIN commit ni push; MSI local
+dist/RESONIQ-Setup-0.2.11-x64-VBCABLE.msi. No publicar sin petición expresa.
+
+Tras instalar la 0.2.10 el usuario dijo que sonaba mejor con RESONIQ apagado,
+luego que los altavoces Realtek directos sonaban mejor, y que «ayer era más
+limpio». Hipótesis DESCARTADAS con medida, no repetirlas:
+- VB-CABLE frente al dispositivo propio: mismo volumen y perfil, diferencia
+  <=0.4 dB en todas las bandas. El transporte no es la causa.
+- Nahimic/efectos de Windows: el usuario tiene Nahimic desactivado; por
+  loopback, vía normal y RAW son idénticas (0.0 dB por banda). Desmarcar
+  «Omitir efectos adicionales» apenas cambia nada al oído.
+Causas reales encontradas:
+- Volumen de los altavoces Realtek, invisible para la aplicación: pasó de
+  100 % a 20 % al usar el usuario la salida directa; luego 100 % saturaba.
+  Con el cable como salida, las teclas solo mueven el cable.
+- El perfil aprobado se juzgó encendido/apagado sin igualar volumen: procesado
+  sonaba 11–13 dB más fuerte que apagado. A igual volumen el usuario prefirió
+  el sonido directo. Favorito: 63 Hz -12..-25 dB, 125 Hz +12..-10 dB según
+  nivel, medios/presencia +7..+20 dB, carácter muy dependiente del volumen.
+- El programa instalado no carga el favorito aprobado al primer arranque:
+  usa los controles del preset (0.8/0.5/0.8/0.2, AGC 100/1500).
+
+Bongiovi DPS 2.2.1.1 instalado por el usuario en el Lenovo (dispositivo
+«Digital Power Station») y MEDIDO con señales mono, altavoces silenciados:
+respuesta casi plana (63–250 Hz -0.6..-0.8 dB, 2–14 kHz -2.0 dB), nivel
+-2.6 dB, cresta +3 dB, idéntico al 100 % y al 30 % (lineal, independiente del
+volumen); -3.2 dB con música a escala completa. El usuario: «con Bongiovi la
+mejora es menor que con Resoniq». Reserva: no se ven efectos estéreo, y es el
+perfil que tuviera seleccionado.
+
+Cambios 0.2.11:
+1. FIFO adaptativa (stream_buffer.hpp): la interpolación lineal perdía 0.8 dB
+   a 8 kHz, 1.8 a 12 kHz y 3 a 16 kHz, y esa pérdida oscilaba varios dB con la
+   deriva de reloj. Ahora sinc enventanado de 16 taps y 256 fases: 0.00 dB
+   hasta 16 kHz, -0.05 a 18 kHz, -0.5 a 20 kHz, sin oscilación. Fase entera
+   sigue siendo paso exacto. Prueba en tests/tests.cpp. Solo medido fuera de
+   línea; falta comprobarlo en la cadena real.
+2. Parámetro opcional de perfil `agc_range_db` (0..6; ausente = 6 histórico,
+   literales 0.5/2 intactos, renders anteriores exactos).
+3. profiles/laptop-soft.dps «Portátil - suave»: corte 70 Hz, cuerpo +4 dB a
+   160 Hz, presencia +4 dB a 3.2 kHz, densidades 1, agc_range_db 0. Medido:
+   nivel +0.0..+0.2 dB respecto a su propia entrada con picos 0.06–0.25,
+   bandas entre -1.5 y +2.5 dB, independiente del nivel; -4 dB a escala
+   completa por el limitador. Es un PUNTO DE PARTIDA para que el usuario
+   compare a igual volumen (botón DSP) contra directo y Bongiovi; no está
+   aprobado ni sustituye al favorito.
+
+Pendiente: escucha del usuario; volumen de altavoces físicos visible/avisado
+en la ventana; arrancar instalaciones nuevas con el favorito; decidir si se
+recupera la igualación de volumen como modo de ajuste; VolCtl del cable.
+
+## Auditoría de Claude y versión 0.2.10 local — 13 de octubre de 2026
+
+Usuario pide a Claude auditar 0.2.5–0.2.9 y después corregir. Estado: cambios
+en el árbol de trabajo, SIN commit, SIN push, SIN release. MSI local
+dist/RESONIQ-Setup-0.2.10-x64-VBCABLE.msi. No publicar sin petición expresa.
+Este equipo es el Lenovo 83LU/Realtek (carpeta Documentos/Desarrollo); el
+Conexant usa «Desarrollo 1». Lo «instalado» en un traspaso es del equipo donde
+se escribió.
+
+Queja del usuario tras instalar 0.2.9 en el Lenovo: suena mejor con RESONIQ
+desactivado. Tenía Gain +12 y lo fijó como ajuste por defecto de este equipo
+(LocalAppData, 15:39). No se ha tocado: es suyo. La 0.2.10 lo carga sin Gain.
+
+Fallos confirmados con medida y corregidos en 0.2.10:
+1. Volumen doble con VB-CABLE cuando el cable ya atenúa su loopback (Lenovo).
+   La 0.2.6 lo supuso siempre sin atenuar. Ahora se mide con piloto y el
+   volumen actúa una vez, ANTES del DSP, como en el dispositivo propio con el
+   que se aprobó el favorito. Detalle y cifras: docs/VB-CABLE_VOLUME.md.
+   src/audio/cable_probe.hpp, endpoint_gain.hpp (antes output_volume.hpp).
+2. Prepare-VBCABLE.ps1 no detectaba un cable ya instalado en Windows
+   PowerShell 5.1 ((función).Count vacío con un solo CimInstance) y abría el
+   instalador de VB-Audio. Corregido con @(); test_vbcable_prepare lo cubre.
+   La casilla de preparar VB-CABLE ya no sale marcada al actualizar.
+
+3. Gain RETIRADO a petición del usuario («elimina entonces el gain»): con
+   Impact+ la salida ya está en el techo; +3 dB subía 0.5–1.3 dB el nivel medio
+   y reducía el contraste de golpes (señal sintética). Sin control, parámetro
+   ni telemetría. `gain_db` de perfiles 0.2.9 se lee y se descarta (cargan a
+   unidad, no se reescribe); así el ajuste por defecto del usuario con +12 se
+   carga sin Gain y sin modificar su archivo. No reintroducirlo sin pedirlo.
+
+Medido, no corregido (decisión del usuario pendiente):
+- Medir sustituye la EQ aprobada (cuerpo 11 -> 6.28, presencia 10 -> 0 en el
+  Conexant); conserva densidad/armónicos. Posible mejora: corregir sobre el
+  perfil en vez de reemplazarlo.
+- resoniq_shutdown_tests no está en CTest. Sospecha sin comprobar: Finalizar
+  tras «Cambiar -> Quitar» podría intentar abrir el exe eliminado.
+- VolCtl=1 activo hace que el cable enmudezca bajo ~6-8 % y baje en escalones.
+
+Validación: 17 CTest (se retira la de Gain), test_installer -Cable -SkipAudioTest y
+test_vbcable_prepare pasan con build/lenovo-release (toolchain portable).
+Host real con cable al 8–50 %: una sola atenuación. Pendiente: instalación y
+escucha del usuario; caso «cable ignora volumen» en el Conexant;
+cierre automático en una actualización real con la aplicación abierta.
+
+## Punto de continuidad actualizado — 13 de octubre de 2026, versión 0.2.9
+
+Usuario pide guardar memoria y resumen para Claude. Traspaso completo de los
+días 12–13 en `docs/CLAUDE_HANDOFF_2026-10-13.md`; esta sección sustituye los
+puntos de retomada antiguos que contradigan el estado actual.
+
+Código publicado: 034688f; README y tag/release v0.2.9: 2c0631f.
+Release pública https://github.com/valvik77/Resoniq/releases/tag/v0.2.9,
+MSI RESONIQ-Setup-0.2.9-x64-VBCABLE.msi, SHA256
+3EDFCB9FADC38C4B53E4C53F7CF6C745DEDD9D417860176DDA052419FFD23B8E.
+Main local/remoto coinciden; memoria y traspaso de este cierre quedan locales,
+sin nuevo commit/push. No publicar automáticamente en cada continuación.
+
+Ahora se trabaja en otro portátil: Conexant ISST Audio y VB-CABLE 3.3.1.7,
+no en el Lenovo Legion/Realtek original. Verificado en este cierre:
+C:/Program Files/RESONIQ/resoniq.exe tiene versión 0.2.9 y está activo.
+Telemetría: Laptop Impact+, Gain +3 dB, DSP/intensidad 100%, controles
+Bass .8 / Clarity .5 / Dynamics .8 / Spatial .2; entrada sin señal.
+No afirmar aprobación auditiva a partir de ese silencio.
+
+0.2.6–0.2.9: banner/logo y Acerca de; versión Windows; volumen VB después
+del DSP según dB del endpoint (loopback real sin atenuación con VolCtl=1);
+captura RAW con fallback y selección por coherencia de canales; cierre de
+actualización compatible con versiones anteriores; arranque en Finalizar;
+Gain ±12 dB opcional/0 por defecto antes del limitador; Realce/Actividad DSP
+antes del volumen; medición tonal conserva la densidad/adaptación/voz musical.
+
+18 CTest pasan; MSI extraído/GUI pasan; helper de cierre probado con copias
+aisladas 0.2.7/0.2.8; host VB real probado en bypass y DSP. Gain 0 conserva
+renders del favorito y sesión bit a bit; favoritos no modificados por agente.
+Favorito original 5119695B...C3E23E; favorito LocalAppData BB43CCE1...6282C1:
+son referencias distintas, no igualarlas. Sesión tampoco debe sobrescribirse.
+
+Usuario confirmó que la medición nueva funciona en Conexant. Último registro:
+RAW=1, usable=1, margen19.42dB,2 bandas,retardo15ms,sin muestras perdidas;
+propuesta167.09Hz/cuerpo6.28dB/presencia0. No nueva captura por agente en esta
+continuación. Mantener consentimiento por medición y descarte de audio.
+
+Pendiente: valorar punch/Gain/conservación de voz musical al escuchar 0.2.9;
+confirmar cierre y apertura durante actualización MSI real (helper aislado no
+equivale a transacción trazada); validar más hardware/transporte/latencia física.
+Windows11 22H2+ x64; no prometer cualquier SO/arquitectura ni equivalencia
+acústica. Mantener DSP/original sin compensación y favorito aprobado.
+Guías: GAIN_AND_METERS, MEASUREMENT_PORTABILITY, INSTALLER_SHUTDOWN,
+VB-CABLE_VOLUME, AUDIT y STABILIZATION en docs.
+
 ## Cierre y sincronización solicitados — 13 de octubre de 2026
 
 Usuario pide guardar memoria, hacer commit y subir a GitHub. Corrección MSI

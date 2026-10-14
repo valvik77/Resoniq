@@ -20,7 +20,7 @@ public:
         if(GetLastError()==ERROR_ALREADY_EXISTS) {CloseHandle(guard);guard=nullptr;throw std::runtime_error("Ya hay otro motor RESONIQ abierto. Cierra su consola antes de iniciar.");}
         state.stop=false;state.dynamicLiftDb=0;state.transientLiftDb=0;state.inputPeak=0;state.outputPeak=0;state.reduction=0;state.underruns=0;state.overflows=0;state.discontinuities=0;state.queued=0;state.latencyMs=0;state.enhancement=1;
         const auto& p=options.parameters;state.enabled=p.enabled;state.intensity=p.intensity;state.bass=p.bass;state.clarity=p.clarity;state.dynamics=p.dynamics;state.spatial=p.spatial;
-        state.gainDb=p.gainDb;state.processedPeak=0;state.dspGainDb=0;
+        state.processedPeak=0;state.dspGainDb=0;state.cableVolume=0;
         failure.clear();finished=false;
         try {thread=std::thread([this,options]{try {dps::runWasapi(options,state);}catch(const std::exception& e){failure=e.what();}catch(...){failure="Error inesperado de audio";}finished.store(true,std::memory_order_release);});}
         catch(...) {finished=true;stop();throw;}

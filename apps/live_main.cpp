@@ -86,7 +86,7 @@ int main(int argc,char** argv) {
         if(outputVolume>=0) dps::setEndpointVolume(options.outputId,outputVolume/100.f);
         std::wcout<<L"Salida: "<<devices[output].name<<L" | Volumen fisico: "<<(outputVolume>=0?outputVolume:devices[output].volume*100)<<L"%\n";
         std::ofstream log;if(!logPath.empty()) {log.open(logPath);if(!log) throw std::runtime_error("Cannot open telemetry log");log<<"preset="<<preset<<"\n";}
-        dps::LiveState state;state.bass=options.parameters.bass;state.clarity=options.parameters.clarity;state.dynamics=options.parameters.dynamics;state.spatial=options.parameters.spatial;state.enabled=options.parameters.enabled;state.intensity=options.parameters.intensity;state.gainDb=options.parameters.gainDb;std::atomic<bool> finished=false;std::exception_ptr failure;
+        dps::LiveState state;state.bass=options.parameters.bass;state.clarity=options.parameters.clarity;state.dynamics=options.parameters.dynamics;state.spatial=options.parameters.spatial;state.enabled=options.parameters.enabled;state.intensity=options.parameters.intensity;std::atomic<bool> finished=false;std::exception_ptr failure;
         std::cout<<"48 kHz stereo float32. Preset: "<<preset<<" | Perfil: "<<profile.name<<" ("<<profile.deviceName<<")"<<" B=activar/desactivar | +/-=intensidad (10%) | S=guardar | Q=salir\n";
         std::jthread worker([&](std::stop_token stop){
             std::stop_callback onStop(stop,[&]{state.stop=true;});
@@ -114,7 +114,7 @@ int main(int argc,char** argv) {
             }
             if(seconds&&std::chrono::steady_clock::now()-start>=std::chrono::seconds(seconds)) state.stop=true;
             std::cout<<'\r'<<"DSP "<<(state.enabled.load()?"ON ":"OFF")<<" | Intensidad "<<std::setw(3)<<static_cast<int>(std::lround(state.intensity.load()*100))<<"% | "<<std::fixed<<std::setprecision(2)<<"In "<<state.inputPeak.load()<<" Out "<<state.outputPeak.load()<<" GR "<<state.reduction.load()<<" dB    "<<std::flush;
-            if(log&&display++%10==0) {log<<"seconds="<<std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()<<" input="<<state.inputPeak.load()<<" output="<<state.outputPeak.load()<<" reduction="<<state.reduction.load()<<" enhancement="<<state.enhancement.load()<<" intensity="<<state.intensity.load()<<" enabled="<<state.enabled.load()<<" under="<<state.underruns.load()<<" over="<<state.overflows.load()<<'\n';log.flush();}
+            if(log&&display++%10==0) {log<<"seconds="<<std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()<<" cable_volume="<<state.cableVolume.load()<<" input="<<state.inputPeak.load()<<" output="<<state.outputPeak.load()<<" reduction="<<state.reduction.load()<<" enhancement="<<state.enhancement.load()<<" intensity="<<state.intensity.load()<<" enabled="<<state.enabled.load()<<" under="<<state.underruns.load()<<" over="<<state.overflows.load()<<'\n';log.flush();}
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         worker.join();std::cout<<'\n';if(failure) std::rethrow_exception(failure);

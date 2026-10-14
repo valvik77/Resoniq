@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <new>
 #include <numbers>
 #include <random>
@@ -33,7 +34,33 @@ try {
     fifo.reset();check(fifo.size()==0,"FIFO reset");
     fifo.tune(0);check(fifo.push(.2f,-.2f)&&fifo.push(.2f,-.2f),"FIFO zero target setup");
     check(fifo.pop(l,r)&&std::isfinite(l)&&std::abs(l-.2f)<1e-6f,"FIFO zero target corrupts resampling");
+    // Clock drift walks the read position through every fractional phase.
+    // The top of the band must neither drop nor breathe while it does.
+    {
+        auto drifting=std::make_unique<dps::StreamBuffer>();
+        double phase=0,owed=0,sum=0,least=1e9,most=0;std::size_t count=0;
+        for(int block=0;block<1200;++block) {
+            owed+=480*1.0005;
+            while(owed>=1) {const auto s=static_cast<float>(std::sin(phase));drifting->push(s,s);phase+=2*3.14159265358979323846*16000/48000;owed-=1;}
+            drifting->tune(960);double energy=0;int got=0;
+            for(int i=0;i<480;++i) {float a,b;if(drifting->size()>480&&drifting->pop(a,b)) {energy+=double(a)*a;++got;}}
+            if(block>=600&&got==480) {sum+=energy;count+=480;least=std::min(least,energy/480);most=std::max(most,energy/480);}
+        }
+        check(count>0&&std::abs(10*std::log10(sum/count/.5))<.1,"Resampler loses level at 16 kHz under clock drift");
+        check(10*std::log10(most/least)<.2,"Resampler level at 16 kHz breathes with clock drift");
+    }
     fifo.reset();
+    // Refilling a nearly full ring overwrites the sinc's consumed history.
+    // The current pair is unity; the wrapped tail must not become its history.
+    {
+        auto full=std::make_unique<dps::StreamBuffer>();
+        // Unity input after overwritten history must never borrow queued tail.
+        for(int i=0;i<20;++i) full->push(1,1);
+        full->tune(10);
+        for(int i=0;i<10;++i) full->pop(l,r);
+        while(full->size()<16384) full->push(-1,-1);
+        check(full->pop(l,r)&&l==1&&r==1,"Full FIFO interpolates overwritten history");
+    }
     for(int i=0;i<2000;++i) fifo.push(.2f,-.2f);
     watch=true;
     for(int i=0;i<1000;++i) {fifo.tune(960);check(fifo.pop(l,r)&&std::abs(l-.2f)<1e-6f&&std::abs(l+r)<1e-6f,"Resampler DC or stereo corruption");}
@@ -60,9 +87,6 @@ try {
         watch=true;
         for(float amount:{0.f,.01f,.1f,.25f,.5f,.75f,1.f}) {
             phase.setIntensity(amount);phase.process(signal.data(),processed.data(),512);
-        }
-        for(float db:{-12.f,0.f,3.f,6.f,12.f}) {
-            phase.setGainDb(db);phase.process(signal.data(),processed.data(),512);
         }
         watch=false;check(allocations==0,"Aligned intensity allocates on audio thread");
     }

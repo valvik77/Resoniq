@@ -41,7 +41,7 @@ if(-not $Production) {
     $taskFiles['driver/build/DpsAudioDevelopment.cer']=Join-Path $taskDriver 'DpsAudioDevelopment.cer'
     foreach($taskScript in @('check_target.ps1','verify_package.ps1')){$taskFiles['driver/'+$taskScript]=Join-Path $taskRoot ('drivers/virtual/'+$taskScript)}
 }
-foreach($taskProfile in @('external.dps','headphones.dps','laptop.dps','laptop-focus.dps','laptop-impact.dps','laptop-impact-plus.dps')){$taskFiles['profiles/'+$taskProfile]=Join-Path $taskRoot ('profiles/'+$taskProfile)}
+foreach($taskProfile in @('external.dps','headphones.dps','laptop.dps','laptop-focus.dps','laptop-impact.dps','laptop-impact-plus.dps','laptop-soft.dps')){$taskFiles['profiles/'+$taskProfile]=Join-Path $taskRoot ('profiles/'+$taskProfile)}
 foreach($taskEntry in $taskFiles.GetEnumerator()){Copy-Item -LiteralPath $taskEntry.Value -Destination (Join-Path $taskPayload $taskEntry.Key) -Force}
 Set-Content -LiteralPath (Join-Path $taskPayload 'installed.marker') -Value 'RESONIQ installed layout v1'
 Set-Content -LiteralPath (Join-Path $taskPayload 'driver/build/signing-mode.txt') -Value $taskMode

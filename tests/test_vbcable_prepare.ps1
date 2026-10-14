@@ -20,4 +20,21 @@ if($taskPreview.ExitCode -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $task
 $taskPreparePreview=Start-Process -FilePath $taskPowerShell -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',('"'+$taskScript+'"'),'-PreparePreview','-PackagePath',('"'+$taskResult.package+'"'),'-DataDirectory',('"'+$taskWork+'"')) -WindowStyle Hidden -PassThru
 if(-not $taskPreparePreview.WaitForExit(20000)){throw 'Async assistant preparation timeout'}
 if($taskPreparePreview.ExitCode -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $taskWork 'prepare-result.json'))){throw 'Async assistant preparation failed'}
-Write-Output ('PASS: official download, SHA-256, publisher/kernel signatures, tamper rejection and UI preview; no driver installed; evidence: '+$taskWork)
+# Detecting an installed cable: run the assistant's own function in the same
+# Windows PowerShell it ships with, against a stand-in that returns exactly one
+# CIM device. A lone CimInstance has no Count there, which hid installed cables.
+$taskSource=Get-Content -LiteralPath $taskScript -Raw
+if($taskSource -match '(?<!@)\(Find-CableDevice\)\.Count'){throw 'Installed cable check counts an unrolled result'}
+$taskFunction=[regex]::Match($taskSource,'(?s)function Find-CableDevice \{.*?\n\}').Value
+if(-not $taskFunction){throw 'Cable detection function not found'}
+$taskCondition=[regex]::Match($taskSource,'@\(Find-CableDevice\)\.Count -gt 0').Value
+if(-not $taskCondition){throw 'Installed cable condition not found'}
+$taskProbe=Join-Path $taskWork 'detect-one.ps1'
+@(
+ $taskFunction.Replace('Get-CimInstance Win32_PnPEntity','Get-CimInstance Win32_OperatingSystem | Add-Member -NotePropertyName HardwareID -NotePropertyValue @(''VBAudioVACWDM'') -PassThru -Force')
+ ('if('+$taskCondition+'){exit 0}else{exit 3}')
+) | Set-Content -LiteralPath $taskProbe -Encoding ASCII
+$taskDetect=Start-Process -FilePath $taskPowerShell -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',('"'+$taskProbe+'"')) -WindowStyle Hidden -PassThru
+if(-not $taskDetect.WaitForExit(20000)){throw 'Installed cable detection timeout'}
+if($taskDetect.ExitCode -ne 0){throw 'A single installed cable is not detected in Windows PowerShell'}
+Write-Output ('PASS: official download, SHA-256, publisher/kernel signatures, tamper rejection, UI preview and single installed cable detection; no driver installed; evidence: '+$taskWork)

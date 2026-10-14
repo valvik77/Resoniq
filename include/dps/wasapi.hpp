@@ -15,8 +15,11 @@ struct LiveState {
     std::atomic<float> bass=.3f,clarity=.25f,dynamics=.3f,spatial=.15f;
     std::atomic<float> dynamicLiftDb=0,transientLiftDb=0;
     std::atomic<float> intensity=1,inputPeak=0,outputPeak=0,reduction=0,enhancement=1;
-    std::atomic<float> gainDb=0,processedPeak=0,dspGainDb=0;
+    std::atomic<float> processedPeak=0,dspGainDb=0;
     std::atomic<unsigned> underruns=0,overflows=0,discontinuities=0,queued=0;
+    // VB-CABLE only: 1 not measured yet, 2 the cable attenuates its own
+    // loopback, 3 it ignores the volume and the host applies it. 0 otherwise.
+    std::atomic<int> cableVolume=0;
     // Estimated latency from endpoint reports, render capacity and FIFO size.
     // This is not a measured acoustic or electrical end-to-end round trip.
     std::atomic<float> latencyMs=0;

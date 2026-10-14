@@ -84,7 +84,8 @@ struct App {
     int scale(int n) const {return MulDiv(n,static_cast<int>(GetDpiForWindow(window)),96);}
     void paintChrome(HWND h,HDC dc) {
         RECT r;GetClientRect(h,&r);const int id=GetDlgCtrlID(h);const bool slider=id>=Slider&&id<Slider+5;
-        auto base=CreateSolidBrush(slider?theme.card:theme.background);FillRect(dc,&r,base);DeleteObject(base);
+        const bool settingsPanel=id>=SetStart&&id<=SetTheme;
+        auto base=CreateSolidBrush(slider||settingsPanel?theme.card:theme.background);FillRect(dc,&r,base);DeleteObject(base);
         const bool enabled=IsWindowEnabled(h)!=FALSE,hot=hovered==h,focused=GetFocus()==h;
         SetBkMode(dc,TRANSPARENT);SelectObject(dc,font);SetTextColor(dc,enabled?theme.text:theme.mutedText);
         if(slider) {
@@ -233,6 +234,11 @@ struct App {
         SendMessageW(raw,BM_SETCHECK,profile.raw?BST_CHECKED:BST_UNCHECKED,0);
         session.state.enabled=p.enabled;publish();buttons();
     }
+    // UI meter only; no gain, limiter or processing is added to the audio path.
+    float displayGainDb() const {
+        const auto in=session.state.inputPeak.load(),out=session.state.outputPeak.load();
+        return in>1e-4f&&out>1e-4f?20*std::log10(out/in):0.f;
+    }
     void publish() {
         auto& p=profile.parameters;
         p.bass=static_cast<float>(SendMessageW(sliders[0],TBM_GETPOS,0,0))/100;
@@ -335,7 +341,7 @@ struct App {
         std::filesystem::create_directories(root/L"build");
         if(!selfTest&&!audioTest) telemetry.open(root/L"build/gui-telemetry.log");
         if(telemetry&&!startupWarning.empty()) telemetry<<"startup_recovery="<<utf8(startupWarning)<<'\n';
-        if(firstRun) {applyDetected(true);applyApprovedProfile();}
+        if(firstRun) applyDetected(true);
         SetTimer(window,1,100,nullptr);
         if(selfTest) SetTimer(window,2,400,nullptr);
         if(audioTest) {SetTimer(window,4,200,nullptr);SetTimer(window,3,1600,nullptr);}
@@ -706,39 +712,6 @@ struct App {
         if(session.running()) {session.stop();ensureAudio();}
         InvalidateRect(window,nullptr,FALSE);
     }
-    // First run on a model whose profile was approved by listening: adopt that
-    // whole profile, not only its tone correction. A new installation used to
-    // start with the preset controls, which are not what was approved, and had
-    // no way of reaching the approved voicing without loading a file by hand.
-    // A machine that is merely inferred or unknown keeps the detected
-    // correction: another laptop's voicing is not an approval for this one.
-    void applyApprovedProfile() {
-        // Every outcome is logged, including the ones that adopt nothing: when
-        // a new installation does not reach the approved voicing, the log has
-        // to say which step declined it instead of leaving the user guessing.
-        const auto suggestion=detectCalibration();
-        const auto file=dps::approvedProfileFile(suggestion.deviceName);
-        const auto path=root/L"profiles"/wide(file);
-        const bool tuned=suggestion.basis==dps::Suggestion::Basis::Tuned;
-        const bool present=!file.empty()&&std::filesystem::exists(path);
-        if(telemetry) telemetry<<"first_run detected="<<suggestion.deviceName<<" tuned="<<tuned
-            <<" file="<<(file.empty()?"none":file)<<" present="<<present<<'\n';
-        if(!tuned||!present) return;
-        try {
-            profile=dps::adoptDistributed(dps::loadProfile(path),profile,prefs.dspAtStart!=0);sync();
-            // Connecting the audio rewrites the status a fifth of a second
-            // later, so this goes through the start-up notice, which survives
-            // that first message.
-            startupWarning=L"Primer arranque: perfil aprobado «"+wide(profile.name)+L"» para este modelo.";
-            status=startupWarning;
-            if(telemetry) telemetry<<"first_run_profile="<<file<<" name="<<profile.name
-                <<" device="<<profile.deviceName<<" bass="<<profile.parameters.bass<<'\n';
-        } catch(const std::exception& error) {
-            // The detected correction already applied stays in place.
-            if(telemetry) telemetry<<"approved_profile_error="<<error.what()<<'\n';
-        }
-        InvalidateRect(window,nullptr,FALSE);
-    }
     // Acoustic measurement. Nothing here touches the microphone until the user
     // has read what it does and agreed to it, and nothing is applied to the
     // sound until they have seen the result and chosen to apply it.
@@ -747,13 +720,10 @@ struct App {
         for(const auto& endpoint:dps::captureEndpoints()) {
             // Prefer a real microphone over a loopback or virtual input.
             const std::wstring name=endpoint.name;
-            if(dps::transportKind(endpoint)!=dps::TransportKind::None) continue;
+            if(name.find(L"DPS")!=std::wstring::npos) continue;
             if(micId.empty()||name.find(L"icr")!=std::wstring::npos) {
                 micId=endpoint.id;micName=name;micVolume=endpoint.volume;
                 micMuted=endpoint.muted;
-            }
-            if(endpoint.defaultCapture) {
-                micId=endpoint.id;micName=name;micVolume=endpoint.volume;micMuted=endpoint.muted;break;
             }
         }
         if(micId.empty()) {
@@ -837,19 +807,16 @@ struct App {
                     <<" alignment_ms="<<measurement.alignmentMs
                     <<" reliable_bands="<<measurement.reliableBands
                     <<" output_raw="<<profile.raw
-                    <<" input_raw="<<captured.rawInput
-                    <<" capture_channel="<<captured.selectedChannel
                     <<" discontinuities="<<captured.discontinuities
                     <<" missing_frames="<<captured.missingFrames
                     <<" output_id="<<utf8(outputIdToMeasure)
                     <<" mic="<<utf8(micName)<<char(10);
-                if(!captured.rawInputError.empty()) dump<<"raw_input_fallback="<<captured.rawInputError<<'\n';
                 for(std::size_t band=0;band<dps::measureBands.size();++band)
                     dump<<"band_hz="<<dps::measureBands[band]<<" level_db="<<measurement.levelDb[band]<<'\n';
                 for(const auto& gap:captured.gaps)
                     dump<<"gap_begin="<<gap.begin<<" gap_frames="<<gap.frames<<'\n';
                 if(measurement.usable) {
-                    const auto proposal=dps::calibrationFrom(measurement,portableMeasurement(),profile.parameters.device);
+                    const auto proposal=dps::calibrationFrom(measurement,true);
                     dump<<"highpass_hz="<<proposal.highpassHz<<" body_db="<<proposal.bodyDb
                         <<" presence_db="<<proposal.presenceDb<<'\n';
                 }
@@ -863,11 +830,6 @@ struct App {
                     dps::writeWav(root/L"build/measure-recorded.wav",recording);
                 }
             } catch(...) {}
-            if(!captured.rawInput) {
-                if(!measurement.warning.empty()) measurement.warning+=' ';
-                measurement.warning+="El controlador no admitio captura RAW. Si oyes los tonos y la medida "
-                    "falla, revisa las mejoras de audio del microfono en Windows.";
-            }
         } catch(const std::exception& e) {
             try {std::ofstream(root/L"build/measure-debug.txt")<<"capture_error="<<e.what()<<'\n'
                 <<"output_raw="<<profile.raw<<" output_id="<<utf8(outputIdToMeasure)<<'\n';}catch(...) {}
@@ -893,7 +855,7 @@ struct App {
             MessageBoxW(window,message.c_str(),L"RESONIQ",MB_OK|MB_ICONWARNING);
             return;
         }
-        const auto proposal=dps::calibrationFrom(measurement,portableMeasurement(),profile.parameters.device);
+        const auto proposal=dps::calibrationFrom(measurement,true);
         std::wstring message=L"Respuesta medida de tus altavoces:\n\n";
         for(std::size_t b=0;b<dps::measureBands.size();++b) {
             wchar_t line[96];
@@ -913,7 +875,7 @@ struct App {
             static_cast<double>(proposal.presenceDb));
         message+=summary;
         if(!measurement.warning.empty()) message+=wide(measurement.warning)+L"\n\n";
-        message+=L"El microfono puede colorear la respuesta: "
+        message+=L"Medido con el microfono del portatil, que no es de medicion: "
               L"es un punto de partida para escuchar, no una calibracion exacta."
               L"\n\nAplicar esta calibracion?";
         if(MessageBoxW(window,message.c_str(),L"Resultado de la medicion",
@@ -1088,7 +1050,7 @@ struct App {
         DrawIconEx(dc,scale(35),scale(26),logo,scale(64),scale(64),0,nullptr,DI_NORMAL);
         SelectObject(dc,titleFont);label(112,26,L"Resoniq");SelectObject(dc,font);
         label(300,49,L"by Valvik",theme.mutedText);
-        label(37,78,L"RESONIQ DSP Engine",theme.mutedText);
+        label(112,78,L"RESONIQ DSP Engine",theme.mutedText);
         label(37,105,L"Tu sonido. Con mas cuerpo.",theme.text);
         label(430,105,L"Actividad DSP",theme.mutedText);
         // Real peak history from the audio worker, rendered on the UI thread.
@@ -1137,7 +1099,7 @@ struct App {
         // there is any, so the meter reflects the work being done.
         {
             const float in=session.state.inputPeak.load();
-            const float gain=session.state.dspGainDb.load();
+            const float gain=displayGainDb();
             const float cut=session.state.reduction.load();
             wchar_t number[96];
             if(in<=1e-4f) wcscpy_s(number,L" sin señal");
@@ -1236,22 +1198,6 @@ struct App {
             if(!virtualId.empty()||SendMessageW(input,CB_GETCURSEL,0,0)!=CB_ERR) throw std::runtime_error("Missing virtual input substituted");
             prefs.virtualInputId=previousId;refresh();
         }
-        // A first run adopts the distributed profile for the detected model,
-        // so this installation must actually carry those files beside it.
-        for(const auto* name:{"Laptop","Laptop Focus","Laptop Impact","Laptop Impact+","Headphones","External"}) {
-            const auto file=dps::approvedProfileFile(name);
-            const auto path=root/L"profiles"/wide(file);
-            if(file.empty()||!std::filesystem::exists(path)) throw std::runtime_error("Distributed profile missing from this installation");
-            if(dps::loadProfile(path).deviceName!=name) throw std::runtime_error("Distributed profile carries another device name");
-        }
-        // On a machine that is only inferred or unknown, the first-run
-        // adoption must leave the profile alone: another laptop's approved
-        // voicing is not an approval for this one.
-        if(detectCalibration().basis!=dps::Suggestion::Basis::Tuned) {
-            const auto before=profile;applyApprovedProfile();
-            if(profile.name!=before.name||profile.deviceName!=before.deviceName||profile.parameters.bass!=before.parameters.bass)
-                throw std::runtime_error("Untuned machine adopted a distributed profile");
-        }
         SendMessageW(sliders[4],TBM_SETPOS,TRUE,37);publish();if(session.state.intensity.load()!=.37f) throw std::runtime_error("Slider did not reach audio state");
         SendMessageW(sliders[4],WM_KEYDOWN,VK_RIGHT,0);
         if(SendMessageW(sliders[4],TBM_GETPOS,0,0)!=38||session.state.intensity.load()!=.38f) throw std::runtime_error("Styled slider keyboard interaction failed");
@@ -1330,6 +1276,22 @@ struct App {
             RECT slider;GetWindowRect(sliders[0],&slider);
             if(SendMessageW(window,WM_NCHITTEST,0,MAKELPARAM(slider.left+4,slider.top+4))!=HTCLIENT)
                 throw std::runtime_error("Controls area treated as caption");
+        }
+        // Both themes must render the main window, settings and About without
+        // changing sound or saving a temporary appearance preference.
+        {
+            const int previousTheme=prefs.themeMode;
+            for(const int mode:{1,2}) {
+                prefs.themeMode=mode;applyTheme();
+                screenshot(root/(mode==1?L"build/gui-dark-preview.bmp":L"build/gui-light-preview.bmp"));
+                openSettings();
+                screenshot2(settings,root/(mode==1?L"build/settings-dark-preview.bmp":L"build/settings-light-preview.bmp"));
+                SendMessageW(settings,WM_COMMAND,SetCancel,0);
+                openAbout();
+                screenshot2(about,root/(mode==1?L"build/about-dark-preview.bmp":L"build/about-light-preview.bmp"));
+                SendMessageW(about,WM_COMMAND,IDCANCEL,0);
+            }
+            prefs.themeMode=previousTheme;applyTheme();
         }
         // Settings window: it must open, carry its controls, and close without
         // disturbing the main window or the saved preferences.
@@ -1458,9 +1420,9 @@ LRESULT CALLBACK procedure(HWND h,UINT message,WPARAM w,LPARAM l) {
                 }
                 if(a->telemetry) {
                 const auto& calibration=a->profile.parameters.device;
-                a->telemetry<<"device="<<a->profile.deviceName<<" cable_volume="<<a->session.state.cableVolume.load()
+                a->telemetry<<"device="<<a->profile.deviceName<<" virtual_input="<<utf8(a->virtualId)
                     <<" output_volume="<<a->outputLevel.volume<<" output_muted="<<a->outputLevel.muted
-                    <<" processed_output="<<a->session.state.processedPeak.load()<<" dsp_gain_db="<<a->session.state.dspGainDb.load()
+                    <<" processed_output="<<a->session.state.outputPeak.load()<<" dsp_gain_db="<<a->displayGainDb()
                     <<" highpass_hz="<<calibration.highpassHz<<" body_db="<<calibration.bodyDb<<" presence_db="<<calibration.presenceDb
                     <<" loud_density="<<calibration.loudDensity<<" band_density="<<calibration.bandDensity<<' ';
 
@@ -1468,7 +1430,7 @@ LRESULT CALLBACK procedure(HWND h,UINT message,WPARAM w,LPARAM l) {
                 }
             }
             std::move(a->activity.begin()+1,a->activity.end(),a->activity.begin());
-            a->activity.back()=a->session.state.processedPeak.load();
+            a->activity.back()=a->session.state.outputPeak.load();
             InvalidateRect(h,nullptr,FALSE);return 0;
         case WM_MEASUREITEM:{auto* item=reinterpret_cast<MEASUREITEMSTRUCT*>(l);item->itemHeight=static_cast<UINT>(a->scale(24));return TRUE;}
         case WM_DRAWITEM: {

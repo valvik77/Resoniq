@@ -1,5 +1,4 @@
 #include "dps/measure.hpp"
-#include "dps/profile.hpp"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -124,34 +123,7 @@ int main() {
         check(!dps::analyseSweep(recorded.data(),recorded.size(),rate,silence.data(),silence.size()).usable,
               "Unrelated noise during sweep accepted as tones");
     }
-    // Stereo microphone arrays may return opposing phase channels. Averaging
-    // cancels a valid sweep; analyse channels separately and prefer coherence.
-    {
-        const std::array<float,8> flat{0,0,0,0,0,0,0,0};
-        const auto left=simulate(sweep,flat,.0001f,21);
-        auto right=left;for(auto& sample:right) sample=-sample;
-        const auto silence=roomNoise(48000,.0001f,22);
-        const auto a=dps::analyseSweep(left.data(),left.size(),rate,silence.data(),silence.size());
-        const auto b=dps::analyseSweep(right.data(),right.size(),rate,silence.data(),silence.size());
-        check(a.usable&&b.usable,"Opposite phase microphone channels rejected");
-        const auto selected=dps::selectMeasurementChannel(a,b);
-        check((selected?b:a).usable,"Microphone channel selection destroyed valid tones");
-        const auto noise=roomNoise(left.size(),.2f,23);
-        const auto unrelated=dps::analyseSweep(noise.data(),noise.size(),rate,silence.data(),silence.size());
-        check(!unrelated.usable&&dps::selectMeasurementChannel(unrelated,a)==1,
-              "Loud incoherent microphone channel preferred over tones");
-    }
     // Crossing the old -10 dB boundary must no longer jump 38 Hz.
-    {
-        dps::Measurement m;m.usable=true;m.levelDb={-37,-23,-8.4f,.85f,7.5f,8.8f,3.05f,-2.4f};
-        auto voicing=dps::deviceCalibration("Laptop Impact+");voicing.transientAccentDb=2;
-        const auto corrected=dps::calibrationFrom(m,true,voicing);
-        check(corrected.bandDensity==voicing.bandDensity&&corrected.loudDensity==voicing.loudDensity&&
-              corrected.adaptiveDepth==voicing.adaptiveDepth&&corrected.detailDb==voicing.detailDb&&
-              corrected.harmonicGain==voicing.harmonicGain&&corrected.transientAccentDb==2,
-              "Measurement erased musical voicing/density");
-        check(corrected.bodyDb!=voicing.bodyDb&&corrected.presenceDb==0,"Measurement did not adapt tonal response");
-    }
     {
         dps::Measurement m;m.usable=true;m.levelDb={-50,-27,-9.99f,7,2,-13,-23,-3};
         const auto a=dps::calibrationFrom(m,true);
@@ -170,8 +142,6 @@ int main() {
                  <<" headroom="<<(m.signalDb-m.noiseFloorDb)<<" usable="<<m.usable<<char(10);
         check(!m.usable,"Noisy measurement was accepted");
         check(!m.warning.empty(),"Rejected measurement gave no reason");
-        check(m.warning.find("Demasiado ruido de fondo")==std::string::npos,
-              "Weak tone capture still asserts that the room is noisy");
         // A refused measurement must not change anything.
         const auto c=dps::calibrationFrom(m,true);
         const dps::DeviceCalibration untouched{};

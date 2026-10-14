@@ -48,9 +48,7 @@ int main(int argc,char** argv) {
             if(!profilePath.empty()||i+1>=argc) throw std::runtime_error("Select one profile file");
             profilePath=argv[++i];profile=dps::loadProfile(profilePath);
         }
-        // Read-only: the enumeration figure beside the direct read the window
-        // now shows each second, so any disagreement is visible here.
-        if(argc==2&&std::string_view(argv[1])=="--status") {for(int k=0;k<5;++k) {for(const auto& d:dps::endpoints()) if(!d.capture) std::wcout<<(d.defaultRender?L"DEFAULT ":L"        ")<<d.name<<L" peak="<<d.peak<<L" volume="<<d.volume*100<<L"% muted="<<d.muted<<L" | "<<dps::volumeCaption(dps::endpointLevel(d.id))<<L'\n';std::this_thread::sleep_for(std::chrono::seconds(1));}return 0;}
+        if(argc==2&&std::string_view(argv[1])=="--status") {for(int k=0;k<5;++k) {for(const auto& d:dps::endpoints()) if(!d.capture) std::wcout<<(d.defaultRender?L"DEFAULT ":L"        ")<<d.name<<L" peak="<<d.peak<<L" volume="<<d.volume*100<<L"% muted="<<d.muted<<L'\n';std::this_thread::sleep_for(std::chrono::seconds(1));}return 0;}
         auto devices=dps::endpoints();if(argc==1||std::string_view(argv[1])=="--list") {for(std::size_t i=0;i<devices.size();++i) {std::wcout<<i<<L" ["<<(devices[i].capture?L"capture":L"render")<<L"] "<<devices[i].name<<L"\n    "<<devices[i].id<<L'\n';}usage();return 0;}
         dps::LiveOptions options;int input=-1,output=-1,seconds=0;std::string preset=profile.presetName,logPath;float outputVolume=-1;bool selected=false,ownDevice=false;options.raw=profile.raw;options.parameters=profile.parameters;
         auto byId=[&](const std::string& value) {std::wstring id(value.begin(),value.end());auto found=std::find_if(devices.begin(),devices.end(),[&](const auto& d){return d.id==id;});if(found==devices.end()) throw std::runtime_error("Endpoint ID not found; run --list");return static_cast<int>(found-devices.begin());};
@@ -116,7 +114,7 @@ int main(int argc,char** argv) {
             }
             if(seconds&&std::chrono::steady_clock::now()-start>=std::chrono::seconds(seconds)) state.stop=true;
             std::cout<<'\r'<<"DSP "<<(state.enabled.load()?"ON ":"OFF")<<" | Intensidad "<<std::setw(3)<<static_cast<int>(std::lround(state.intensity.load()*100))<<"% | "<<std::fixed<<std::setprecision(2)<<"In "<<state.inputPeak.load()<<" Out "<<state.outputPeak.load()<<" GR "<<state.reduction.load()<<" dB    "<<std::flush;
-            if(log&&display++%10==0) {log<<"seconds="<<std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()<<" cable_volume="<<state.cableVolume.load()<<" input="<<state.inputPeak.load()<<" output="<<state.outputPeak.load()<<" reduction="<<state.reduction.load()<<" enhancement="<<state.enhancement.load()<<" intensity="<<state.intensity.load()<<" enabled="<<state.enabled.load()<<" under="<<state.underruns.load()<<" over="<<state.overflows.load()<<'\n';log.flush();}
+            if(log&&display++%10==0) {log<<"seconds="<<std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()<<" input="<<state.inputPeak.load()<<" output="<<state.outputPeak.load()<<" reduction="<<state.reduction.load()<<" enhancement="<<state.enhancement.load()<<" intensity="<<state.intensity.load()<<" enabled="<<state.enabled.load()<<" under="<<state.underruns.load()<<" over="<<state.overflows.load()<<'\n';log.flush();}
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         worker.join();std::cout<<'\n';if(failure) std::rethrow_exception(failure);

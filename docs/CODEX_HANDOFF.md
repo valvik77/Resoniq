@@ -1,5 +1,37 @@
 # Traspaso a Codex — sesión del 12 de octubre de 2026
 
+> **Último estado: 0.2.15 local instalada, interfaz actual y audio archivado.**
+> Leer primero PROJECT_MEMORY.md y CLASSIC_UI_2026-10-14.md. Motor, búfer,
+> WASAPI y perfiles de 0.2.0 protegidos por contrato; render del favorito
+> idéntico al archivo. 18/18 pruebas y MSI extraído pasan. Temas, iconos,
+> Ajustes, inicio Windows/minimizado, entrada virtual, volumen Windows,
+> versión y Acerca de integrados. Transporte propio 20 %, Realtek 24 %, DSP
+> activo y RAW; sesión/favorito originales intactos. Arranque en bandeja activo.
+> «Ahora sí funciona» del usuario fue un mensaje equivocado: escucha pendiente.
+> No cambiar sonido ni adoptar perfiles automáticamente. Código 0.2.15 para
+> main por petición de commit/push; última release descargable sigue 0.2.13.
+> Resumen actualizado para Claude: CLAUDE_HANDOFF_2026-10-14.md.
+> Backup 0.2.0/config en build/classic-ui-install-backup-20261014-233637.
+> Estados inferiores históricos.
+
+> **Último estado: vuelta solicitada a 0.2.0 archivada, instalada.**
+> Fuente archives/own-driver-20261012-234107-2b8044, verificada (97 archivos).
+> Aplicación sola, sin cambios de driver; sesión y favorito del cierre aprobado
+> restaurados por hash, DSP activo, RAW y transporte propio al 20 %. Volumen
+> físico histórico no registrado: conservar el que el usuario elija. Pendiente
+> escucha, no afirmar recuperación acústica exacta. Backup 0.2.14 y evidencia
+> en build/restore-approved-20261012. Cambios recientes del workspace conservados.
+> Leer primero PROJECT_MEMORY.md; los estados inferiores son históricos.
+
+> **Actualización 14 de octubre (noche): 0.2.14 instalada localmente.**
+> Leer primero PROJECT_MEMORY.md y ROUTE_DIAGNOSTIC_2026-10-14.md.
+> «Original» ahora devuelve dry sin el limitador DSP tras el fundido. El usuario
+> confirma limpieza prácticamente igual que Realtek directo con transporte propio.
+> 18/18 pruebas, render del favorito activo idéntico y MSI extraído verificado.
+> Instalación habitual actualizada, 16 archivos iguales al paquete: Original,
+> RAW y transporte propio; favorito intacto. Sin commit/push/release de 0.2.14;
+> GitHub sigue en 0.2.13. No extrapolar escucha al DSP activo ni a VB-CABLE.
+
 > ## Cierre del 14 de octubre (tarde) — 0.2.13 PUBLICADA
 >
 > Empieza por la primera sección de `PROJECT_MEMORY.md`, que detalla todo esto.

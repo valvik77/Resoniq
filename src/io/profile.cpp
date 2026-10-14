@@ -62,12 +62,8 @@ Profile loadProfile(const std::filesystem::path& path) {
         else if(key=="dynamics") row>>v.dynamics;
         else if(key=="spatial") row>>v.spatial;
         else if(key=="intensity") row>>v.intensity;
-        // Written by 0.2.9 only. The control was withdrawn: read and drop it
-        // so those sessions and favourites still load, at unity.
-        else if(key=="gain_db") {float withdrawn=0;row>>withdrawn;}
         else if(key=="agc_attack_ms") row>>v.agcAttackMs;
         else if(key=="agc_release_ms") row>>v.agcReleaseMs;
-        else if(key=="agc_range_db") row>>v.agcRangeDb;
         else if(key=="highpass_hz") row>>d.highpassHz;
         else if(key=="body_hz") row>>d.bodyHz;
         else if(key=="body_db") row>>d.bodyDb;
@@ -104,7 +100,6 @@ void saveProfile(const std::filesystem::path& path,const Profile& p) {
        <<"\nenabled "<<v.enabled<<"\nadaptive "<<v.adaptive<<"\nbass "<<v.bass<<"\nclarity "<<v.clarity<<"\ndynamics "<<v.dynamics<<"\nspatial "<<v.spatial<<"\nintensity "<<v.intensity
        <<"\nagc_attack_ms "<<v.agcAttackMs<<"\nagc_release_ms "<<v.agcReleaseMs<<"\nhighpass_hz "<<d.highpassHz<<"\nbody_hz "<<d.bodyHz<<"\nbody_db "<<d.bodyDb<<"\npresence_hz "<<d.presenceHz<<"\npresence_db "<<d.presenceDb<<"\nharmonic_gain "<<d.harmonicGain<<"\nstereo_amount "<<d.stereoAmount<<"\nmud_hz "<<d.mudHz<<"\nmud_db "<<d.mudDb<<"\ndetail_db "<<d.detailDb<<"\nharmonic_focus "<<d.harmonicFocus<<"\nbody_floor "<<d.bodyFloor<<"\nadaptive_depth "<<d.adaptiveDepth<<"\nloud_density "<<d.loudDensity<<"\nband_density "<<d.bandDensity<<'\n';
     if(v.alignedIntensity) out<<"aligned_intensity 1\n";
-    if(v.agcRangeDb!=6) out<<"agc_range_db "<<v.agcRangeDb<<'\n';
     if(d.transientAccentDb>0) out<<"transient_accent_db "<<d.transientAccentDb<<'\n';
     file.commit();
 }

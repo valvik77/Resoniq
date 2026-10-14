@@ -52,9 +52,6 @@ void Engine::prepare(double rate,Parameters p) {
     auto valid=[](float v,float lo,float hi){return std::isfinite(v)&&v>=lo&&v<=hi;};
     if(!valid(d.highpassHz,20,200)||!valid(d.bodyHz,100,500)||!valid(d.bodyDb,0,12)||!valid(d.presenceHz,1000,6000)||!valid(d.presenceDb,0,12)||!valid(d.harmonicGain,0,2)||!valid(d.stereoAmount,0,1)||!valid(d.mudHz,300,1200)||!valid(d.mudDb,-9,0)||!valid(d.detailDb,0,6)||!valid(d.harmonicFocus,0,1)||!valid(d.bodyFloor,0,1)||!valid(d.adaptiveDepth,0,0.9f)||!valid(d.loudDensity,1,2.5f)||!valid(d.bandDensity,1,4)) throw std::invalid_argument("Invalid device calibration");
     if(!valid(d.transientAccentDb,0,6)) throw std::invalid_argument("Invalid transient accent");
-    if(!valid(p.agcRangeDb,0,6)) throw std::invalid_argument("Invalid level control range");
-    // The historical limits are kept as literals so legacy renders stay bit-exact.
-    agcFloor_=p.agcRangeDb==6?.5f:std::pow(10.f,-p.agcRangeDb/20);agcCeiling_=p.agcRangeDb==6?2.f:std::pow(10.f,p.agcRangeDb/20);
     parameters_=p;rate_=rate;
     if(p.alignedIntensity) for(std::size_t bank=0;bank<intensityPhase_.size();++bank)
         for(auto& channel:intensityPhase_[bank]) for(std::size_t stage=0;stage<3;++stage)
@@ -230,7 +227,7 @@ void Engine::process(const float* input,float* output,std::size_t frames) noexce
         // AGC measures the already-lifted signal and pulls its own gain down by
         // the same amount, cancelling the density the compressor just created.
         const float seen=agcEnvelope_/std::max(makeup,1e-3f);
-        const float target=seen>0.015f?std::clamp(levelTarget/std::max(seen,0.015f),agcFloor_,agcCeiling_):1.f;
+        const float target=seen>0.015f?std::clamp(levelTarget/std::max(seen,0.015f),0.5f,2.f):1.f;
         c=target<agcGain_?agcAttack_:agcRelease_;agcGain_=c*agcGain_+(1-c)*target;
         const float mid=(wet[0]+wet[1])*0.5f,side=(wet[0]-wet[1])*0.5f*(1+parameters_.device.stereoAmount*controls_[3]);
         wet={(mid+side)*agcGain_,(mid-side)*agcGain_};

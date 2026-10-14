@@ -14,6 +14,14 @@ VB-CABLE o controlador propio, RESONIQ DSP Engine y salida física por WASAPI. E
 es ofrecer la mejora de altavoces de portátil que busca el usuario. El perfil
 Laptop Impact+ fue aprobado por escucha en el Lenovo Legion Pro 5 83LU.
 
+La versión local **0.2.15** reúne la interfaz actual y el audio de la **0.2.0
+archivada**, recuperado por petición del usuario. Incluye iconos, temas
+claro/oscuro/sistema, Ajustes, inicio con Windows y minimizado, entrada virtual,
+lectura del volumen de Windows, versión visible y Acerca de. El motor, el búfer
+y el bucle de audio conservan el código archivado; el favorito y la sesión
+se mantienen. Detalles y verificaciones en [esta entrega local](docs/CLASSIC_UI_2026-10-14.md).
+La última descarga publicada en GitHub sigue siendo la 0.2.13.
+
 ## Uso en este equipo
 
 Abre **Start-RESONIQ.cmd** y selecciona **Altavoces (DPS Audio Virtual Transport)**
@@ -28,7 +36,7 @@ ese dispositivo físico, leído cada segundo, e indica si está silenciado. Es u
 lectura informativa para comparar DSP activado y desactivado al mismo nivel:
 la aplicación no iguala volúmenes ni los cambia por su cuenta. Si el endpoint
 no ofrece control de volumen, se indica «sin dato» en lugar de suponer cero.
-`dps_live --status` imprime esa misma lectura junto a la de la enumeración.
+`dps_live --status` imprime el volumen de los dispositivos enumerados.
 
 La ventana usa Win32/GDI+, temas claro/oscuro/sistema y controles propios.
 Al cerrarla se oculta en la bandeja y continúa procesando, salvo que se configure
@@ -66,13 +74,9 @@ perfil ajustado para un modelo conocido, una inferencia y un genérico. Los
 auriculares tienen prioridad. El reconocimiento por nombre y modelo no
 identifica con certeza todos los dispositivos externos conectados al portátil.
 
-En el primer arranque, sin sesión ni ajuste guardados, una instalación nueva
-en un modelo con perfil aprobado por escucha carga ese perfil completo de
-`profiles/` (controles, AGC y densidades), no solo su corrección de tono. La
-salida elegida en este equipo y el estado inicial del DSP no se toman del
-archivo. En un equipo solo inferido o no reconocido no se adopta: se mantiene
-la corrección detectada, porque el ajuste aprobado en otro portátil no es una
-aprobación para este. Después del primer arranque manda siempre la sesión.
+En la 0.2.15, el primer arranque sin sesión ni ajuste guardados detecta una
+corrección de tono, como la base archivada. No adopta automáticamente un
+perfil completo distribuido. La sesión guardada conserva prioridad.
 
 «Medir» pide permiso cada vez antes de usar el micrófono y vuelve a pedirlo antes
 de aplicar una propuesta. Reproduce ocho tonos y analiza la captura localmente.
@@ -93,7 +97,7 @@ y desfase. Ver [consolidación](docs/CONSOLIDATION.md) para cambios y límites.
 
 ## Compilar y verificar
 
-Requisitos: CMake ≥3.20, compilador C++20; para GUI/WASAPI, Windows y Windows SDK.
+Requisitos: CMake ≥3.20, compilador C++20 y Python 3 para las pruebas; para GUI/WASAPI, Windows y Windows SDK.
 En Visual Studio, CMake puede estar disponible solo desde su consola de desarrollo.
 
 ```powershell
@@ -103,12 +107,14 @@ ctest --test-dir build -C Release --output-on-failure
 python tests/test_driver_package.py
 ```
 
-Hay diecisiete pruebas en Windows: DSP, perfiles, transporte virtual, recuperación, comparación interna, timbre,
+Hay dieciocho pruebas en Windows: DSP, perfiles, entrada virtual, recuperación, comparación interna, timbre,
 transitorios, medición, preferencias, elección de calibración, WAV, GUI y errores
 WASAPI, silencio del endpoint e intensidad experimental. Las pruebas WASAPI de error comprueban entradas
 inválidas y COM STA sin abrir el micrófono; la de silencio comprueba mute, cero
 y notificaciones sin asignaciones.
 La prueba de ataques evalúa el ensayo temporal, cuerpo y techo de salida.
+El contrato de audio compara el código protegido con hashes de la base
+archivada; funciona sin necesitar la carpeta local de archivos históricos.
 La comprobación del dispositivo enumera únicamente nuestro Hardware ID, sin instalarlo.
 La prueba de paquete requiere el controlador de desarrollo ya construido y
 firmado; es offline y no cambia almacenes de certificados ni instala nada.
@@ -129,10 +135,20 @@ No sustituye un instalador ni la firma de producción.
 
 ## Instalador y dispositivo virtual
 
-El instalador actual es `dist/RESONIQ-Setup-0.2.13-x64-VBCABLE.msi`, generada
-con `installer/Build-CableInstaller.ps1` y publicada como v0.2.13. Instala
+El instalador publicado es `dist/RESONIQ-Setup-0.2.13-x64-VBCABLE.msi`, generado
+con `installer/Build-CableInstaller.ps1` y publicado como v0.2.13. Instala
 RESONIQ y añade un asistente «Instalar VB-CABLE» al menú Inicio; al finalizar
 ofrece abrirlo.
+El instalador local actual es `dist/RESONIQ-Setup-0.2.15-x64-VBCABLE.msi`.
+Está instalado en el equipo de desarrollo, sin publicar: interfaz actual
+con audio de la 0.2.0 archivada. La instalación conserva el controlador propio
+existente, Realtek como salida y los datos del usuario. Las 0.2.14 y 0.2.0
+permanecen respaldadas. La historia del diagnóstico está en
+[ROUTE_DIAGNOSTIC_2026-10-14.md](docs/ROUTE_DIAGNOSTIC_2026-10-14.md).
+
+Los cambios siguientes describen las versiones publicadas anteriores. Las
+mejoras posteriores de audio, volumen del cable, medición y adopción automática
+de perfiles no forman parte del motor restaurado de la 0.2.15.
 Descarga, verifica las firmas y extrae el paquete oficial, y abre su instalador
 con elevación. Quedan la autorización de administrador, «Install Driver» y el
 reinicio manual. Si el dispositivo existe, evita abrir el instalador de nuevo.

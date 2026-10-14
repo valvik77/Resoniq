@@ -1,5 +1,10 @@
 # Traspaso de RESONIQ a Claude
 
+> **Estado vigente: 14 de octubre, 0.2.15 instalada.** Leer primero
+> [CLAUDE_HANDOFF_2026-10-14.md](CLAUDE_HANDOFF_2026-10-14.md) y la primera
+> sección de PROJECT_MEMORY.md. Interfaz actual con audio restaurado de 0.2.0;
+> escucha pendiente. El resto de este documento describe el estado histórico.
+
 Estado: 12 de octubre de 2026. Lee primero `AGENTS.md`, este documento y
 `docs/PROJECT_MEMORY.md`. La memoria contiene historia: las decisiones recientes
 sustituyen a las antiguas. Inspecciona el código antes de modificarlo.

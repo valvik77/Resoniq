@@ -1,5 +1,205 @@
 # Memoria del proyecto
 
+## Interfaz actual con audio restaurado — 14 de octubre de 2026, 0.2.15
+
+ESTADO ACTUAL: 0.2.15 instalada localmente en Program Files, por petición de
+incorporar estética, configuración, iconos, inicio con Windows, temas claro y
+oscuro, volumen Windows, versión, Acerca de, entrada virtual y minimizado.
+Ver `CLASSIC_UI_2026-10-14.md` para implementación, hashes y evidencia.
+GUI moderna con MOTOR/BÚFER/BUCLE WASAPI/PERFILES de la 0.2.0 archivada.
+No portar ajustes posteriores de sonido ni compensación/piloto del cable.
+Contrato de audio en tests protege la base; render favorito bit a bit contra
+compilación del archivo. 18/18 CTest, capturas ambos temas y MSI extraído pasan.
+MSI instalación salida 0; 15 archivos Program Files iguales al payload;
+registro y exe 0.2.15. Sin cambios de controlador/certificados.
+
+Proceso actual: PID en `build/install-0.2.15-process.pid`, aplicación instalada,
+arranque oculto en bandeja verificado. Inicio Windows y minimizado activos;
+tema sistema, cierre a bandeja, reconexión y DSP como última vez conservados.
+Windows: transporte propio predeterminado 20 %, salida física Realtek 24 %.
+DSP=1, RAW=1, Laptop Impact+, controles .95/.9/.85/.3/intensidad 1.
+Al salir del GUI antiguo, sesión guardó CABLE como salida; se detectó ausencia
+de salida física en la nueva GUI, se recuperó sesión EXACTA del backup y se
+reinició solo proceso nuevo. Estado final running=1, finished=0, under=over=0,
+sin señal reproduciéndose; volumen físico .24. Favorito repo/LocalAppData
+5119695B…C3E23E y sesión repo/LocalAppData 5B437712…EC90 intactos.
+Backup instalado anterior: build/classic-ui-install-backup-20261014-233637.
+Cambios workspace previos: build/before-classic-ui-20261014-232619.
+
+CORRECCIÓN DEL USUARIO: «ahora sí funciona» era para otra conversación;
+todavía no había probado la restauración. NO registrar aprobación auditiva
+de la 0.2.0 recuperada ni de esta 0.2.15. Se conserva la escucha pendiente.
+Cierre solicitado por el usuario: commit y push del código 0.2.15 a main,
+memoria guardada y resumen en `CLAUDE_HANDOFF_2026-10-14.md`.
+La última release/descarga de GitHub sigue siendo 0.2.13; el push de código
+no publica un MSI ni una release 0.2.15. Los estados inferiores son históricos.
+
+## Diagnóstico de distorsión por el cable — 14 de octubre de 2026 (noche)
+
+RETORNO solicitado por el usuario («vuelve entonces»): instalación habitual
+restaurada a 0.2.0, desde archives/own-driver-20261012-234107-2b8044,
+el cierre anterior a VB-CABLE donde STABILIZATION.md registra sonido aprobado.
+97 archivos del archivo verificados contra manifiesto; GUI archivado pasa
+autotest aislado. Se retiró MSI 0.2.14 (salida 0) e instaló MSI archivado
+0.2.0 Development, SOLO ADDLOCAL=Application (salida 0); ningún driver ni
+certificado se reinstaló. Preflight dispositivo antes/después idéntico.
+Ejecutable ACTUAL Program Files SHA256
+7F299A4FCCE4A3B8F0FFCC6E9C19ED4536213E5A6890ADF1E2B96B24D15F4E9C,
+igual al archivo. Registro: RESONIQ - controlador de desarrollo 0.2.0.
+Sesión LocalAppData restaurada EXACTA al hash del cierre aprobado
+5B437712…EC90, favorito exacto 5119695B…C3E23E; DSP ACTIVO, RAW=1,
+Impact+, controles .95/.9/.85/.3. No se reactivó igualación de volumen.
+Windows usa transporte propio al 20 %, para recuperar nivel moderado de
+entrada (~0.06 documentado en aprobación). El nivel físico histórico NO se
+guardó: se conserva el elegido por usuario (22 % al empezar, 24 % al verificar),
+sin afirmar reconstrucción exacta de volumen acústico. Favorito repo intacto.
+Proceso actual Program Files, PID en build/restore-approved-20261012/process.pid.
+0.2.14/config previa respaldados en esa carpeta; MSI 0.2.14 conservado en dist.
+No borrados/reset de cambios de código del workspace ni cambios GitHub.
+Última lectura: host activo, DSP=1, sin cortes y sin señal reproduciéndose.
+Pendiente escucha del usuario; NO afirmar recuperado el punto auditivo exacto.
+El MSI antiguo tiene la limitación histórica de condición OS en mantenimiento:
+al instalar se pasó WINDOWSBUILD real del registro; no rehacer ni improvisar
+el controlador. Este estado sustituye las notas inferiores de 0.2.14 instalada.
+
+ÚLTIMA VALORACIÓN tras instalar 0.2.14: usuario sigue prefiriendo Realtek
+directo; dice que se perdió el punto conseguido antes de buscar mejoras y
+considera dejar el proyecto. La queja NO está resuelta; la escucha favorable
+de la copia de prueba inferior fue provisional y no cierra el resultado actual.
+Comprobación solo lectura: sigue enabled=0 (Original, dejado así para diagnóstico),
+Realtek ahora 22 %, sin señal en ese instante. Favorito repo conserva SHA256
+5119695B…C3E23E. No se cambió audio/perfil/volumen en esta respuesta.
+No más ajustes especulativos: si el usuario retoma, reconstruir la versión y
+condiciones exactas de la escucha aprobada, no suponer que conservar solo el
+perfil equivale a recuperar ese sonido. No hay petición explícita de desinstalar.
+
+INSTALACIÓN HABITUAL ACTUALIZADA por petición expresa del usuario: 0.2.14.
+MSI `dist/RESONIQ-Setup-0.2.14-x64-VBCABLE.msi`, SHA256
+`BCE968D2E737FA12E556946AF928DE5D1F06AAE0B472F400CAE373E6932BC338`.
+Build estático en route-minimal-release (MSVC portable), 18/18 CTest y
+test_installer -Cable -SkipAudioTest pasan. Instalación msiexec con elevación,
+salida 0, registro de desinstalación y recurso de exe 0.2.14. Los 16 archivos
+de Program Files coinciden con payload verificado. Proceso ACTUAL desde
+`C:/Program Files/RESONIQ/resoniq.exe` (PID en build/install-0.2.14-process.pid).
+GUI/copia de prueba y CLI detenidos. Configuración LocalAppData actual:
+misma configuración de sonido aprobada, enabled=0, RAW=1, virtual_input_id
+del transporte propio. Preferencias habituales de inicio/tray preservadas.
+Windows: transporte propio predeterminado al 100 %, Realtek 28 %; VB-CABLE
+permanece instalado sin reinstalar ni retirar su soporte.
+Favorito del repo SHA256 5119695B…C3E23E intacto. Configuración habitual previa
+y ejecutable 0.2.13 respaldados: ruta en build/install-0.2.14-backup-path.txt.
+Última comprobación: aplicación conectada en Original, sin señal reproduciéndose;
+sin reducción ni realces. El audio del mismo binario de prueba ya fue aprobado,
+pero no se reprodujo nuevo audio durante la verificación postinstalación.
+La 0.2.14 todavía SIN commit, push ni publicación; GitHub continúa en 0.2.13.
+Este estado sustituye las notas inferiores de «sin instalar» y procesos de prueba.
+
+VALIDACIÓN AUDITIVA FINAL: usuario confirma del Original corregido «es limpio
+y suena prácticamente igual a la salida directa por Realtek». Es el GUI de
+prueba con transporte propio, RAW=1, DSP apagado, virtual fijado 100 % y
+Realtek 28 %. Queda validado por escucha este bypass en este equipo/programa.
+No extrapolar al DSP activo ni dar VB-CABLE por probado con la corrección.
+Sesión de prueba sigue en build/bypass-fixed-gui, sin instalar/publicar.
+Última telemetría: entrada=salida, reducción=0, realces=0; under=2 acumulado,
+over=0. Favorito mantiene su SHA256 original. 18/18 pruebas y render favorito
+activo bit a bit documentados debajo. Próxima entrega: empaquetar este arreglo
+cuando se solicite; la instalación habitual 0.2.13 todavía no lo contiene.
+
+ESTADO MÁS RECIENTE: en comparación con mismo transporte/volúmenes, usuario
+dice que Original habitual suena menos limpio que la ruta mínima. Se corrigió
+Engine: el limitador de -1 dBFS estaba también después de la mezcla seca y
+atenuaba Original. Ahora se cruza suavemente hacia dry DESPUÉS del limitador,
+se alcanzan extremos exactos y en bypass asentado la salida es dry, reducción
+y realces de medidores cero. Se conserva comparación normalizada solo interna.
+18/18 CTest (nuevo tests/bypass.cpp: muestra exacta, picos altos, estéreo,
+in-place, particiones, transiciones, reactivación del limitador y no finitos).
+Render sintético del favorito ACTIVO antes/después idéntico bit a bit:
+SHA256 2CF7A277…A213D. Favorito archivo 5119695B…C3E23E intacto.
+Usuario oye el Original corregido «más limpio y más bajo»; el volumen virtual
+había cambiado durante la escucha a 52 % (luego 62 %), Realtek seguía 28 %.
+Se volvió a fijar SOLO virtual 100 % para comparar, Realtek 28 %. La escucha
+posterior confirma limpieza y práctica igualdad con directo, ver arriba.
+Proceso ACTUAL: `build/bypass-fixed-gui/resoniq.exe`, configuración aislada
+junto a ese exe: perfil original copiado, enabled=0, RAW=1, virtual propio.
+Telemetría `build/bypass-fixed-gui/build/gui-telemetry.log`: input=output ~1.0,
+reducción/realces 0, sin cortes. PID guardado en esa carpeta. CLI detenido.
+La primera apertura del GUI desde build/route-minimal-release ignoró --data-dir
+por no llevar installed.marker y leyó config del repo; detectado y detenido,
+sin guardar. Corregido copiando exe + profiles + config a carpeta aislada.
+La instalación de Program Files sigue 0.2.13 anterior, SIN este arreglo.
+No MSI nuevo, commit, push ni release. Escucha del bypass confirmada;
+no cerrar la queja del DSP activo ni extrapolar resultado a VB-CABLE todavía.
+
+Última escucha: usuario confirma audio y dice «suena prácticamente igual
+realtek o dsp propio» CON RUTA MÍNIMA, virtual 100 % y Realtek 28 %.
+No atribuir mejora solo a quitar Engine: también se eliminó la atenuación
+virtual. Para aislarlo se cambia al «Original» habitual, mismo CLI/perfil/RAW,
+transporte y volúmenes, pero sin --transport-only. Host actual en
+`build/route-original-check/host.pid`, telemetría en esa carpeta. Ruta mínima
+detenida. Pendiente valorar si Original vuelve a sonar menos limpio o solo
+cambia nivel. Favorito conservado; no cambios instalados ni publicados.
+
+Actualización de escucha: usuario respondió «No se oye audio» a la ruta mínima.
+Primera lectura posterior: todos los endpoints sin señal y host vivo sin error.
+Segunda lectura: música entra y sale por Realtek; `transport_only=1`, `enabled=0`,
+reducción cero y input=output, picos ~1.01–1.05 (sin limitador). Realtek muestra
+picos ~0.87–0.98; volumen 28 %, transporte propio predeterminado al 100 %.
+No se cambió configuración para recuperar señal. Dos underruns acumulados
+en pausas/reanudaciones; estables durante la reproducción actual. Esto verifica
+funcionamiento digital, no que el usuario oiga audio ni limpieza. Pendiente
+confirmación de que oye la prueba; no considerar el silencio una comparación.
+
+ESTADO ACTUAL: usuario también oye peor y más bajo el transporte propio frente
+a Realtek directo. Autoriza probar ruta mínima sin motor ni limitador. Se añadió
+`dps_live --transport-only` (solo diagnóstico CLI; GUI conserva comportamiento).
+Compilación nueva `build/route-minimal-release` porque local-release conserva
+rutas de otro equipo; sin avisos, 17/17 CTest y diff revisado.
+Proceso activo: dps_live de esa carpeta, PID en `build/route-minimal-check/host.pid`,
+`--dps --transport-only --raw --profile restore-original.dps`, telemetría en esa
+carpeta. RESONIQ GUI instalada detenida para no duplicar reproducción.
+Windows: transporte propio predeterminado, volumen virtual 100 % (antes 40 %),
+Realtek conserva 28 % (lo eligió el usuario antes de la prueba). Así se elimina
+la atenuación extra del virtual para comparar con directo. Sin motor/limitador,
+se conservan FIFO/adaptación de relojes, volumen/mute y rampa de arranque.
+Favorito intacto. Inicialmente no entra señal: pendiente reproducción y escucha.
+Para volver a directo: seleccionar Realtek en Windows y detener ese dps_live.
+Para volver a GUI: detener dps_live y arrancar instalación con restore-original.
+Restaurar volumen del transporte a 40 % antes de volver al DSP habitual si
+se quiere recuperar el estado previo. No publicar: cambios de diagnóstico locales.
+
+Último estado: usuario autoriza probar el transporte propio antiguo. Windows
+usa ahora «DPS Audio Virtual Transport» como salida predeterminada, y RESONIQ
+se ejecuta con `--data-dir build/own-transport-check`, DSP apagado y RAW=1,
+salida Realtek. Música pasó por esa ruta (input/output ~0.061 con volumen
+virtual 20 %). Se subió SOLO el transporte propio a 41 % para acercarlo al
+nivel previo del cable al 42 % (~0.218); no se confirmó igualdad porque la
+reproducción se detuvo. Realtek permanece al 50 %. VB-CABLE instalado,
+configuración habitual sigue apuntándolo, favorito intacto. Sin retirada de
+soporte en código: prueba reversible. Pendiente escucha con música y nivel
+comparable. Una falta de datos al cesar reproducción dejó `under=1`.
+
+Actualización: repetida la prueba con efectos Windows permitidos, el usuario
+dice «yo lo oigo igual». No mejora por escucha. Se restauró RAW=1 y DSP apagado
+en la ejecución habitual usando `--profile` a `restore-original.dps` (copia
+del perfil original con enabled=0); favorito intacto. La causa sigue abierta.
+
+Usuario confirma distorsión también en «Original», pero Realtek directo limpio.
+Sesión actual comprobada: Lenovo 83LU / Realtek, instalada 0.2.13 (NO Conexant).
+Ver docs/ROUTE_DIAGNOSTIC_2026-10-14.md para resultados y límites. DSP apagado,
+loopbacks de cable y Realtek correlacionan >0.999, ganancia prácticamente 1,
+sin muestras perdidas al capturar con búfer amplio. Tonos de 250/1000/4000 Hz
+no muestran gran distorsión añadida en la captura digital. Esto NO localiza
+ni descarta la distorsión que oye el usuario; no se midió acústicamente.
+Prueba temporal aislada con raw=0 y DSP apagado: digitalmente parecida;
+valoración del usuario tras repetir: suena igual. Se restauró la ejecución habitual, configuración
+original y favorito intactos. Sesiones emisoras silenciadas durante los tonos
+y restauradas; no se cambió volumen de endpoints ni se guardó audio.
+El cable pasó de 72 % a 22 % durante la sesión; no fue un cambio de Codex.
+No hay corrección de código, commit, push ni release en este diagnóstico.
+Sigue pendiente localizar la alteración con comparación directa controlada
+por nivel/programa y, si procede, comprobar la salida física. No atribuirla
+al perfil, al cable o a efectos Windows como causa ya demostrada.
+
 ## Volumen físico visible en la ventana — 14 de octubre de 2026
 
 Punto de partida: 0.2.11 ya publicada (etiqueta `v0.2.11`, `origin/main` al día,
@@ -1909,4 +2109,3 @@ prometer nada al usuario:
 
 Nada de esto es trabajo urgente. El usuario tiene un sonido que le gusta y el
 proyecto esta estable.
-

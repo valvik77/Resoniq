@@ -1,5 +1,54 @@
 # Traspaso a Codex — sesión del 12 de octubre de 2026
 
+> ## Cierre del 14 de octubre (tarde) — 0.2.13 PUBLICADA
+>
+> Empieza por la primera sección de `PROJECT_MEMORY.md`, que detalla todo esto.
+> Lo de abajo es histórico y describe estados anteriores.
+>
+> **Estado:** `main` = `origin/main`, versión **0.2.13 publicada** (etiqueta
+> `v0.2.13`, release con MSI adjunto, enlace del README actualizado). MSI
+> SHA256 `2AC818FC…DB39F325`. Esto sustituye cualquier «sin publicar» anterior.
+>
+> **Qué se hizo (cinco commits):** (1) la ventana muestra el volumen de Windows
+> de la salida física, leído cada segundo, con «sin dato» si el endpoint no
+> contesta; nuevo `dps::endpointLevel` y `volumeCaption` en
+> `include/dps/endpoint_level.hpp`; también en telemetría y en
+> `dps_live --status`. (2) El primer arranque de una instalación nueva adopta
+> el perfil distribuido completo del modelo reconocido (`approvedProfileFile`
+> en `hardware.hpp`, regla de mezcla en `adoptDistributed` de `profile.hpp`).
+> (3) Empaquetado 0.2.12. (4) El aviso del primer arranque lo borraba
+> `ensureAudio()` 200 ms después de abrir la ventana: ahora va por
+> `startupWarning` y `applyApprovedProfile` registra SIEMPRE su decisión en
+> `build/gui-telemetry.log` (`first_run detected=… tuned=… file=… present=…`).
+> Empaquetado 0.2.13. (5) Documentación de la publicación.
+>
+> **LÍMITE PRINCIPAL:** la rama que SÍ adopta el perfil aprobado (`tuned=1`)
+> **no se ha ejecutado nunca**, ni antes ni después de publicar: exige el
+> Lenovo 83LU. Se verificó la rama contraria en una copia aislada
+> (`first_run detected=Laptop Focus tuned=0 … present=1`, sin adoptar nada) y
+> las piezas por separado con pruebas. No la des por buena sin el log del
+> Lenovo. El usuario instaló la 0.2.12 y no vio el mensaje; eso se explicó por
+> el estado sobrescrito, NO por un fallo de adopción demostrado.
+>
+> **Equipos:** la sesión corrió en un equipo con Conexant ISST + VB-CABLE, que
+> NO es el Lenovo: es el del caso pendiente «el cable ignora el volumen». Allí
+> no hay Visual Studio; se compila con `. build/tools/portable-env.ps1` y
+> `cmake --build build/local-release` (17 CTest), y el MSI con runtime estático
+> desde `build/installer-portable`, porque la caché de `build/installer-release`
+> es de un generador de Visual Studio.
+>
+> **Pendientes:** comprobar la adopción en el Lenovo; VolCtl del cable y su
+> límite inferior; «Medir» sobre el perfil; el caso Conexant con audio real; y
+> la escucha del usuario. Publicar no demuestra mejora acústica ni cierra la
+> queja de sonido de caja/distorsión.
+>
+> **Reglas que siguen vigentes:** sin igualación de volumen en la aplicación
+> (la comparación visible es DSP activado/desactivado sin compensar); conservar
+> el favorito y no sobrescribir sesiones ajenas; no adoptar perfiles aprobados
+> en equipos solo inferidos; no reproducir audio, tocar volúmenes ni publicar
+> sin petición expresa. En esta sesión el usuario autorizó expresamente el
+> push, la release y sobrescribir su configuración del Lenovo.
+
 > Último cierre, 14 de octubre: empezar por la primera sección de
 > PROJECT_MEMORY.md. Usuario percibe sonido de caja/distorsión con procesado;
 > diagnóstico pendiente. Instalada observada 0.2.11. Había sesión mixta

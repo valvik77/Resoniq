@@ -4,11 +4,16 @@
 #include <vector>
 #include "dps/engine.hpp"
 #include "dps/audio_gap.hpp"
+#include "dps/endpoint_level.hpp"
 namespace dps {
 struct Endpoint {std::wstring id,name;bool capture=false;float peak=0;bool defaultRender=false;float volume=-1;bool muted=false;std::wstring interfaceName;bool defaultCapture=false;};
 std::vector<Endpoint> endpoints();
 // Control thread only. Explicit physical endpoint volume, in [0,1].
 void setEndpointVolume(const std::wstring& id,float volume);
+// Control thread only. One endpoint's current volume and mute, so the window
+// can show the real physical level each second without enumerating every
+// device. An unset level means the endpoint answered no volume control.
+EndpointLevel endpointLevel(const std::wstring& id);
 struct LiveOptions {std::wstring inputId,outputId;bool loopback=false,tone=false,raw=false;Parameters parameters;};
 struct LiveState {
     std::atomic<bool> stop=false,enabled=true;

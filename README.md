@@ -23,6 +23,13 @@ compensar volumen. La igualación solo existe en pruebas internas. El host respe
 «Silencio» y volumen cero del endpoint virtual aunque su captura loopback siga
 entregando audio: silencia la salida después del DSP, incluido el bypass.
 
+Junto a la lista de salida, la ventana muestra el volumen que Windows aplica a
+ese dispositivo físico, leído cada segundo, e indica si está silenciado. Es una
+lectura informativa para comparar DSP activado y desactivado al mismo nivel:
+la aplicación no iguala volúmenes ni los cambia por su cuenta. Si el endpoint
+no ofrece control de volumen, se indica «sin dato» en lugar de suponer cero.
+`dps_live --status` imprime esa misma lectura junto a la de la enumeración.
+
 La ventana usa Win32/GDI+, temas claro/oscuro/sistema y controles propios.
 Al cerrarla se oculta en la bandeja y continúa procesando, salvo que se configure
 «Al cerrar la ventana, salir del todo». El menú de bandeja permite salir.
@@ -114,7 +121,7 @@ No sustituye un instalador ni la firma de producción.
 
 ## Instalador y dispositivo virtual
 
-El instalador actual es `dist/RESONIQ-Setup-0.2.9-x64-VBCABLE.msi`,
+El instalador actual es `dist/RESONIQ-Setup-0.2.11-x64-VBCABLE.msi`,
 generada con `installer/Build-CableInstaller.ps1`. Instala RESONIQ y añade
 un asistente «Instalar VB-CABLE» al menú Inicio; al finalizar ofrece abrirlo.
 Descarga, verifica las firmas y extrae el paquete oficial, y abre su instalador

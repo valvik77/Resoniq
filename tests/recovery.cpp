@@ -1,4 +1,5 @@
 #include "dps/endpoint_selection.hpp"
+#include "dps/endpoint_level.hpp"
 #include <stdexcept>
 #include <iostream>
 #include <string>
@@ -16,5 +17,14 @@ int main(){try {
     std::reverse(outputs.begin(),outputs.end());
     check(dps::selectOutput(outputs,L"headphones")==0,"Enumeration order changes destination");
     outputs.clear();check(dps::selectOutput(outputs,L"headphones")==-1,"Empty outputs accepted");
-    std::cout<<"PASS: saved output, disconnect, reconnect, reorder and first-use selection\n";
+    // The window reports the physical level, so a missing reading must not be
+    // shown as silence and a muted endpoint must not look like a live one.
+    check(dps::volumeCaption({})==L"Volumen de Windows sin dato","Unknown level reported as a figure");
+    check(dps::volumeCaption({-1.f,true})==L"Volumen de Windows sin dato","Unread level reported as muted");
+    check(dps::volumeCaption({0.f,false})==L"Volumen de Windows 0 %","Zero volume lost its reading");
+    check(dps::volumeCaption({.42f,false})==L"Volumen de Windows 42 %","Volume percentage wrong");
+    check(dps::volumeCaption({.425f,false})==L"Volumen de Windows 43 %","Percentage not rounded");
+    check(dps::volumeCaption({1.f,false})==L"Volumen de Windows 100 %","Full volume lost its reading");
+    check(dps::volumeCaption({.3f,true})==L"Volumen de Windows silenciado (30 %)","Mute not reported with its level");
+    std::cout<<"PASS: saved output, disconnect, reconnect, reorder, first-use selection and physical level caption\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

@@ -1,5 +1,41 @@
 # Memoria del proyecto
 
+## Volumen físico visible en la ventana — 14 de octubre de 2026
+
+Punto de partida: 0.2.11 ya publicada (etiqueta `v0.2.11`, `origin/main` al día,
+árbol limpio). Lo de esta sesión es trabajo nuevo encima de esa base, aún sin
+nueva versión, sin MSI nuevo y sin instalar.
+
+Equipo de esta sesión: no es el Lenovo. Tiene `C:/Program Files/CONEXANT`,
+salida física «Altavoz (Conexant ISST Audio)» y VB-CABLE instalado. Es decir,
+es el equipo del caso pendiente «el cable ignora el volumen», que sigue SIN
+comprobarse: en esta sesión no se reprodujo audio ni se movió ningún volumen.
+Compilación con `build/tools/portable-env.ps1` y `build/local-release`
+(MSVC portable 14.44 + CMake 4.4.4); no hay Visual Studio instalado aquí.
+
+Cambio: la ventana muestra el volumen que Windows aplica a la salida física
+elegida, a la derecha sobre la lista de salida, y lo marca en color cálido si
+está silenciada. Resuelve el pendiente «volumen de altavoces visible en la
+ventana». Es solo lectura: no iguala ni cambia volúmenes.
+- `include/dps/endpoint_level.hpp`: `EndpointLevel` y `volumeCaption`, que
+  muestra el mismo porcentaje entero que el deslizador de Windows y dice
+  «sin dato» cuando el endpoint no respondió, en vez de suponer cero.
+- `dps::endpointLevel(id)` en `src/audio/wasapi.cpp`: lectura directa por COM
+  desde el hilo de control, sin tocar el hilo de audio.
+- GUI: lee al refrescar y una vez por segundo; registra `output_volume` y
+  `output_muted` en la telemetría.
+- `dps_live --status` imprime la lectura directa junto a la de la enumeración.
+
+Verificación en este equipo: `--status` da 100 % en el altavoz Conexant y 10 %
+en el cable, y la lectura directa coincide con la enumeración. La captura del
+autotest muestra «Volumen de Windows 100 %» junto a «Altavoz (Conexant ISST
+Audio)», sin solaparse con «Entrada virtual». Build sin avisos y 17/17 CTest
+pasan. No se ejecutó MSI ni instalador, ni se tocaron perfiles, sesión ni
+favorito. README corregido: el instalador actual es el 0.2.11, no el 0.2.9.
+
+Siguen pendientes: favorito al primer arranque, VolCtl del cable, «Medir»
+sobre el perfil, el caso Conexant con audio real y la escucha del usuario.
+
 ## Preparación de publicación 0.2.11 — 14 de octubre de 2026
 
 El usuario autoriza explícitamente commit, push y release de los cambios

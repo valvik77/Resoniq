@@ -72,6 +72,7 @@ struct App {
     std::filesystem::path root,profilePath,requestedProfile,dataRootOverride;
     dps::Profile profile;
     std::vector<dps::Endpoint> physical,virtualInputs;
+    dps::EndpointLevel outputLevel;
     std::wstring virtualId,status=L"Preparado. Selecciona una salida e inicia el audio.";
     std::wstring startupWarning;
     Session session;
@@ -210,6 +211,19 @@ struct App {
         if(transport>=0) {virtualId=virtualInputs[transport].id;routed=virtualInputs[transport].defaultRender;}
         const int choice=dps::selectOutput(physical,previous.empty()?wide(profile.outputId):previous);
         SendMessageW(output,CB_SETCURSEL,choice,0);
+        // The enumeration already read every endpoint's volume, so the new
+        // selection starts from a real figure instead of a blank one.
+        outputLevel=choice>=0&&static_cast<std::size_t>(choice)<physical.size()
+            ?dps::EndpointLevel{physical[choice].volume,physical[choice].muted}:dps::EndpointLevel{};
+    }
+    // The physical level changes outside this application and nothing here
+    // matches volumes, so the window re-reads the selected endpoint instead of
+    // showing what the last enumeration happened to see.
+    void readOutputLevel() {
+        const auto index=static_cast<int>(SendMessageW(output,CB_GETCURSEL,0,0));
+        if(index<0||static_cast<std::size_t>(index)>=physical.size()) {outputLevel={};return;}
+        try {outputLevel=dps::endpointLevel(physical[index].id);}
+        catch(const std::exception& error) {outputLevel={};if(telemetry) telemetry<<"output_level_error="<<error.what()<<'\n';}
     }
     void sync() {
         const auto& p=profile.parameters;const std::array<float,5> values{p.bass,p.clarity,p.dynamics,p.spatial,p.intensity};
@@ -1054,6 +1068,16 @@ struct App {
         Polygon(dc,wave.data(),static_cast<int>(wave.size()));
         SelectObject(dc,oldBrush);SelectObject(dc,oldPen);DeleteObject(waveBrush);DeleteObject(wavePen);
         label(30,200,L"Salida de audio",theme.mutedText);label(450,200,L"Entrada virtual",theme.mutedText);label(30,277,L"Perfil del dispositivo",theme.mutedText);label(290,277,L"Perfil acustico",theme.mutedText);
+        {
+            // Windows' own reading for the selected output, right-aligned with
+            // the list below it. Shown with the DSP comparison in view: the
+            // application never equalises loudness, so the user can check that
+            // the physical level is the same on both sides of the comparison.
+            const auto caption=dps::volumeCaption(outputLevel);
+            SIZE extent{};GetTextExtentPoint32W(dc,caption.c_str(),static_cast<int>(caption.size()),&extent);
+            SetTextColor(dc,outputLevel.muted?theme.warm:theme.mutedText);
+            TextOutW(dc,scale(435)-extent.cx,scale(200),caption.c_str(),static_cast<int>(caption.size()));
+        }
         rounded(dc,{scale(20),scale(410),scale(860),scale(715)},theme.card,theme.cardEdge,scale(12));
         drawIcon(dc,Icon::Intensity,scale(35),scale(424),scale(22),theme.accent,scale(2)*1.f);
         label(67,425,L"INTENSIDAD",theme.text);label(67,449,L"Mezcla del procesamiento",theme.mutedText);
@@ -1372,6 +1396,7 @@ LRESULT CALLBACK procedure(HWND h,UINT message,WPARAM w,LPARAM l) {
                 }
             }
             if(a->ticks++%10==0) {
+                a->readOutputLevel();
                 if(a->session.running()) {
                     try {
                         bool routed=false;for(const auto& endpoint:dps::endpoints()) if(endpoint.defaultRender&&endpoint.id==a->virtualId) routed=true;
@@ -1383,6 +1408,7 @@ LRESULT CALLBACK procedure(HWND h,UINT message,WPARAM w,LPARAM l) {
                 if(a->telemetry) {
                 const auto& calibration=a->profile.parameters.device;
                 a->telemetry<<"device="<<a->profile.deviceName<<" cable_volume="<<a->session.state.cableVolume.load()
+                    <<" output_volume="<<a->outputLevel.volume<<" output_muted="<<a->outputLevel.muted
                     <<" processed_output="<<a->session.state.processedPeak.load()<<" dsp_gain_db="<<a->session.state.dspGainDb.load()
                     <<" highpass_hz="<<calibration.highpassHz<<" body_db="<<calibration.bodyDb<<" presence_db="<<calibration.presenceDb
                     <<" loud_density="<<calibration.loudDensity<<" band_density="<<calibration.bandDensity<<' ';

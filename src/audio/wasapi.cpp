@@ -272,6 +272,20 @@ void setEndpointVolume(const std::wstring& id,float scalar) {
     require(volume->SetMasterVolumeLevelScalar(scalar,nullptr),"Set output volume");
     require(volume->SetMute(FALSE,nullptr),"Unmute output");
 }
+EndpointLevel endpointLevel(const std::wstring& id) {
+    EndpointLevel level;
+    if(id.empty()) return level;
+    Com com;auto e=enumerator();ComPtr<IMMDevice> device;require(e->GetDevice(id.c_str(),&device),"Level endpoint");
+    ComPtr<IAudioEndpointVolume> volume;
+    // A device without an endpoint volume control is reported as unknown
+    // rather than as zero: the window must not claim a level it never read.
+    if(FAILED(device->Activate(__uuidof(IAudioEndpointVolume),CLSCTX_ALL,nullptr,reinterpret_cast<void**>(volume.GetAddressOf())))) return level;
+    float scalar=-1;BOOL muted=FALSE;
+    if(FAILED(volume->GetMasterVolumeLevelScalar(&scalar))) return level;
+    if(SUCCEEDED(volume->GetMute(&muted))) level.muted=muted!=FALSE;
+    level.volume=scalar;
+    return level;
+}
 void runWasapi(const LiveOptions& options,LiveState& state) {
     static_assert(std::atomic<float>::is_always_lock_free && std::atomic<unsigned>::is_always_lock_free && std::atomic<bool>::is_always_lock_free);
     if(!options.tone&&options.inputId==options.outputId) throw std::runtime_error("Input and output endpoints must differ to avoid feedback");

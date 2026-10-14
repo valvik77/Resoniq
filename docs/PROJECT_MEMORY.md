@@ -64,9 +64,9 @@ el mismo número durante el diagnóstico. Compilado con runtime estático en
 `test_installer.ps1 -Cable -SkipAudioTest` pasa: incluye el autotest sobre la
 distribución extraída, de modo que el MSI lleva de verdad los seis perfiles
 que el primer arranque necesita. 17/17 CTest con la versión subida.
-NO publicado: sin etiqueta, sin release y sin instalar aquí; el enlace de
-descarga del README sigue apuntando a la v0.2.11. El usuario autorizó
-sobrescribir lo que tenga en el Lenovo al instalar esta versión.
+En el momento de empaquetarla no estaba publicada ni instalada aquí; se
+publicó después, ver el quinto paso. El usuario autorizó sobrescribir lo que
+tenga en el Lenovo al instalar esta versión.
 
 Cuarto paso: el usuario instaló la 0.2.12 en el Lenovo y NO vio el mensaje
 «Primer arranque: perfil aprobado…». Causa encontrada en el código: 200 ms
@@ -88,10 +88,16 @@ Diagnóstico pendiente del usuario: en el `build/gui-telemetry.log` de su
 LocalAppData, los campos `device=` y `bass=` dicen si la adopción ocurrió
 aunque el mensaje no se viera (0.95 = perfil aprobado, 0.8 = preset).
 
-Siguen pendientes tras esta sesión: comprobar en el Lenovo la adopción del
-perfil aprobado al primer arranque, VolCtl del cable, «Medir» sobre el perfil,
-el caso Conexant con audio real y la escucha del usuario. Nada de esto se
-publica aún: la versión distribuida sigue siendo la 0.2.11.
+Quinto paso, a petición expresa del usuario: PUBLICACIÓN de la 0.2.13.
+Etiqueta `v0.2.13` y release de GitHub con el MSI adjunto; enlace de descarga
+del README actualizado a la v0.2.13. Sustituye a cualquier nota anterior de
+esta sesión que diga «sin publicar»: la versión distribuida pasa a ser 0.2.13.
+
+Siguen pendientes tras publicar: comprobar en el Lenovo la adopción del perfil
+aprobado al primer arranque (la rama `tuned=1` no se ha ejecutado en ningún
+equipo, tampoco antes de publicar), VolCtl del cable, «Medir» sobre el perfil,
+el caso Conexant con audio real y la escucha del usuario. Publicar no
+demuestra mejora acústica ni cierra la queja de sonido.
 
 ## Preparación de publicación 0.2.11 — 14 de octubre de 2026
 

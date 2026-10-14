@@ -330,10 +330,12 @@ struct App {
         // like instead of a profile meant for a different laptop.
         if(!selfTest&&!audioTest&&profilePath.empty()&&requestedProfile.empty()) firstRun=true;
         refresh();sync();layout();
-        if(firstRun) {applyDetected(true);applyApprovedProfile();}
+        // The log is opened before the first run decides anything, so what a
+        // new installation started from is on record from the first line.
         std::filesystem::create_directories(root/L"build");
         if(!selfTest&&!audioTest) telemetry.open(root/L"build/gui-telemetry.log");
         if(telemetry&&!startupWarning.empty()) telemetry<<"startup_recovery="<<utf8(startupWarning)<<'\n';
+        if(firstRun) {applyDetected(true);applyApprovedProfile();}
         SetTimer(window,1,100,nullptr);
         if(selfTest) SetTimer(window,2,400,nullptr);
         if(audioTest) {SetTimer(window,4,200,nullptr);SetTimer(window,3,1600,nullptr);}
@@ -711,15 +713,26 @@ struct App {
     // A machine that is merely inferred or unknown keeps the detected
     // correction: another laptop's voicing is not an approval for this one.
     void applyApprovedProfile() {
+        // Every outcome is logged, including the ones that adopt nothing: when
+        // a new installation does not reach the approved voicing, the log has
+        // to say which step declined it instead of leaving the user guessing.
         const auto suggestion=detectCalibration();
-        if(suggestion.basis!=dps::Suggestion::Basis::Tuned) return;
         const auto file=dps::approvedProfileFile(suggestion.deviceName);
-        if(file.empty()) return;
         const auto path=root/L"profiles"/wide(file);
-        if(!std::filesystem::exists(path)) return;
+        const bool tuned=suggestion.basis==dps::Suggestion::Basis::Tuned;
+        const bool present=!file.empty()&&std::filesystem::exists(path);
+        if(telemetry) telemetry<<"first_run detected="<<suggestion.deviceName<<" tuned="<<tuned
+            <<" file="<<(file.empty()?"none":file)<<" present="<<present<<'\n';
+        if(!tuned||!present) return;
         try {
             profile=dps::adoptDistributed(dps::loadProfile(path),profile,prefs.dspAtStart!=0);sync();
-            status=L"Primer arranque: perfil aprobado «"+wide(profile.name)+L"» para este modelo.";
+            // Connecting the audio rewrites the status a fifth of a second
+            // later, so this goes through the start-up notice, which survives
+            // that first message.
+            startupWarning=L"Primer arranque: perfil aprobado «"+wide(profile.name)+L"» para este modelo.";
+            status=startupWarning;
+            if(telemetry) telemetry<<"first_run_profile="<<file<<" name="<<profile.name
+                <<" device="<<profile.deviceName<<" bass="<<profile.parameters.bass<<'\n';
         } catch(const std::exception& error) {
             // The detected correction already applied stays in place.
             if(telemetry) telemetry<<"approved_profile_error="<<error.what()<<'\n';

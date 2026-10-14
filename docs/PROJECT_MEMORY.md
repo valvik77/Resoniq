@@ -52,11 +52,13 @@ adopta ninguno. 17/17 CTest. LÍMITE: la rama que sí adopta no se pudo ejecutar
 aquí porque este equipo no es el modelo conocido; falta comprobarla en el
 Lenovo con una instalación nueva (o con LocalAppData\RESONIQ\config vacío).
 
-Tercer paso, a petición del usuario: versión 0.2.12 y MSI nuevo.
-`dist/RESONIQ-Setup-0.2.12-x64-VBCABLE.msi`, SHA256
-`CEB5A6F82AA8A7BDD34478621BA9B935F1786182F4F2D1E989C45DCF9E6B6790`.
-Versión subida en `CMakeLists.txt` e `installer/CableProduct.wxs`; el binario
-empaquetado declara ProductVersion 0.2.12. Compilado con runtime estático en
+Tercer paso, a petición del usuario: versiones 0.2.12 y 0.2.13 con MSI.
+`dist/RESONIQ-Setup-0.2.13-x64-VBCABLE.msi`, SHA256
+`2AC818FCC4BA7EEC8C3270AB6370BDB07EBAB878D1531526A3EC026BDB39F325`.
+La 0.2.12 (SHA256 `CEB5A6F8...6B6790`) se retiró de `dist/`: nunca se publicó
+y la sustituye la 0.2.13 con el arreglo del aviso. `AllowSameVersionUpgrades`
+está activo, pero se subió la versión para no tener dos binarios distintos con
+el mismo número durante el diagnóstico. Compilado con runtime estático en
 `build/installer-portable` (NMake + MSVC portable), porque la caché de
 `build/installer-release` es de Visual Studio 18 y aquí no hay VS instalado.
 `test_installer.ps1 -Cable -SkipAudioTest` pasa: incluye el autotest sobre la
@@ -64,7 +66,27 @@ distribución extraída, de modo que el MSI lleva de verdad los seis perfiles
 que el primer arranque necesita. 17/17 CTest con la versión subida.
 NO publicado: sin etiqueta, sin release y sin instalar aquí; el enlace de
 descarga del README sigue apuntando a la v0.2.11. El usuario autorizó
-sobrescribir lo que tenga en el Lenovo al instalar esta 0.2.12.
+sobrescribir lo que tenga en el Lenovo al instalar esta versión.
+
+Cuarto paso: el usuario instaló la 0.2.12 en el Lenovo y NO vio el mensaje
+«Primer arranque: perfil aprobado…». Causa encontrada en el código: 200 ms
+después de abrir la ventana, el temporizador 4 llama a `ensureAudio()`, que
+reescribe la línea de estado. El mensaje existía pero duraba un repintado.
+Esto NO demuestra que la adopción fallara; solo que el aviso era invisible.
+Arreglo en 0.2.13: el aviso va por `startupWarning`, que `ensureAudio()`
+vuelve a poner tras conectar, y `applyApprovedProfile` registra SIEMPRE su
+resultado en la telemetría, también cuando no adopta:
+`first_run detected=<perfil> tuned=<0|1> file=<archivo> present=<0|1>` y,
+si adopta, `first_run_profile=... name=... device=... bass=...`.
+La telemetría se abre ahora antes de decidir el primer arranque.
+Comprobado en este equipo con copia aislada (`--data-dir` a carpeta vacía y
+entrada virtual inexistente para no abrir audio): sale
+`first_run detected=Laptop Focus tuned=0 file=laptop-focus.dps present=1`,
+no se adopta nada y `output_volume=1` confirma la lectura del altavoz.
+La rama que SÍ adopta sigue sin ejecutarse: requiere el Lenovo.
+Diagnóstico pendiente del usuario: en el `build/gui-telemetry.log` de su
+LocalAppData, los campos `device=` y `bass=` dicen si la adopción ocurrió
+aunque el mensaje no se viera (0.95 = perfil aprobado, 0.8 = preset).
 
 Siguen pendientes tras esta sesión: comprobar en el Lenovo la adopción del
 perfil aprobado al primer arranque, VolCtl del cable, «Medir» sobre el perfil,

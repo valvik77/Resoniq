@@ -1,5 +1,39 @@
 # Memoria del proyecto
 
+## Instalador regenerado y entrega Git — 15 de octubre de 2026
+
+Petición: generar instalador, commit y push. Reconstruida la base actual 0.2.15
+sin cambios de código ni versión (el código ya está en a62e492). Instalador:
+`dist/RESONIQ-Setup-0.2.15-x64-VBCABLE.msi` (formato Windows Installer).
+SHA256 A1A1424BE1681AB593C30898C5CA4C58252EB98A1DFE0E34873607B2D5BA9459.
+Exe empaquetado SHA256
+9332D01EC30C5E1D1656A091ED5997829B13AC50AD093396E3A1F10F335327D8.
+Build Release/runtime estático, 18/18 CTest pasan. test_installer -Cable
+-SkipAudioTest pasa: payload, condición OS, prerrequisitos, aislamiento de
+controlador y GUI extraída; evidencia build/installer-test-551cf9f10f214765a5b2c84adcec5a65.
+No se ejecutó prueba de reproducción ni se reinstaló la aplicación local.
+Favorito repo/LocalAppData sigue SHA256 5119695B…C3E23E. Ruta local VB-CABLE
+conservada. El MSI no incluye configuraciones privadas ni identificadores de
+endpoint de este equipo. dist/ continúa ignorado: commit/push entregan fuentes
+y documentación, el instalador se entrega por su ruta local; sin nueva release.
+
+## Cambio solicitado a VB-CABLE — 15 de octubre de 2026
+
+Usuario pide «cambialo»: Windows predeterminado ahora CABLE Input
+{0.0.0.00000000}.{66a2c6a8-365f-40e1-b754-e389bbaa8928}, los tres roles.
+Preferencia virtual_input_id actualizada al mismo endpoint. RESONIQ instalada
+reiniciada --tray, PID en la carpeta indicada por build/switch-vbcable-path.txt.
+Telemetría running=1, finished=0, DSP=1, RAW conservado, under=over=0.
+Salida sigue Realtek, volumen observado 50 %, cable ~42.4 %; no se tocaron
+volúmenes. Sesión actual conserva bass .8 / clarity .5 / dynamics .8 / spatial .2,
+intensidad 1 (ajustes del usuario posteriores al cierre anterior); sesión sin
+cambios de contenido. Favorito SHA256 5119695B…C3E23E intacto.
+Backup config-before y enumeración endpoints-after.txt en esa carpeta.
+La ventana del proceso previo no era accesible con FindWindow; reinicio por
+Stop-Process, preservando archivos y parámetros concordantes con telemetría.
+Sin reinstalación de drivers ni cambios de motor/igualación. Conexión verificada;
+no había señal significativa reproduciéndose: escucha del usuario pendiente.
+
 ## Interfaz actual con audio restaurado — 14 de octubre de 2026, 0.2.15
 
 ESTADO ACTUAL: 0.2.15 instalada localmente en Program Files, por petición de

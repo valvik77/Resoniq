@@ -1,5 +1,38 @@
 # Memoria del proyecto
 
+## Escucha: visto bueno PROVISIONAL del ajuste suave — 23 de octubre de 2026, noche
+
+Preguntado si esta base suena como quiere, el usuario responde: «si, parece
+que, de momento, es lo que quiero». Se registra con sus reservas intactas:
+«parece» y «de momento». NO es una aprobación cerrada y no debe citarse como
+tal. Precedente que obliga a esta prudencia: el 14 de octubre un «ahora sí
+funciona» hubo que retirarlo porque se refería a otra conversación.
+
+Lo que estaba escuchando, medido en la sesión y la telemetría del momento, no
+reconstruido: versión 0.2.17 instalada, perfil «Referencia - Portatil impacto»,
+dispositivo Laptop Impact+, preset RESONIQ Max, DSP activo, RAW=1, adaptive=1,
+intensidad 1, y los controles **suaves**: graves 0,80, claridad 0,50,
+dinámica 0,80, espacialidad 0,20. Corrección de tono: paso alto 175 Hz,
+cuerpo 300 Hz +11 dB, presencia 3 kHz +10 dB, barro 600 Hz -6 dB, detalle 6 dB,
+densidades 1,45 / 1,80, ganancia armónica 1,6, estéreo 0,5. Entrada por CABLE,
+salida Realtek {9e3be449…} con volumen leído 0,600074, latencia ~56 ms,
+sin under ni over. Sesión en SHA256
+C3BA7682CCEED41983627AB31F83F0F8FE82923B5D0AF7F1DC768457E8EE4070.
+
+DATO RELEVANTE: lo aprobado NO es lo que guarda su favorito. El favorito sigue
+en 5119695B…C3E23E con los controles FUERTES (0,95 / 0,90 / 0,85 / 0,30) y
+apuntando además al endpoint de salida ya inexistente {6e5d6ebf…}. Es decir,
+el visto bueno va para la línea del volumen igualado y el perfil suave, no para
+el ajuste que ganaba por sonar más fuerte. Ver `docs/` y el histórico de
+comparación a igual volumen.
+
+RIESGO QUE HAY QUE RESOLVER: lo aprobado vive SOLO en la sesión, y la sesión se
+reescribe cada vez que se cierra la aplicación. Si el usuario mueve un control
+y cierra, ese punto se pierde. Se le ha preguntado si quiere conservarlo como
+favorito o como perfil aparte; NO se ha tocado ni el favorito ni los perfiles
+por iniciativa propia, porque igualar favorito y sesión sin permiso está
+expresamente prohibido en este proyecto.
+
 ## VALIDADO: arranca al iniciar sesión — 23 de octubre de 2026, noche
 
 El usuario reinició y confirma que el programa ya arranca al inicio. Medido, no

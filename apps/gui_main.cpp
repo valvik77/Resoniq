@@ -1,5 +1,6 @@
 #include "gui_theme.hpp"
 #include "gui_icons.hpp"
+#include "windows_startup.hpp"
 #include "resoniq_version.h"
 #include "audio_session.hpp"
 #include "dps/endpoint_selection.hpp"
@@ -23,6 +24,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -291,17 +293,24 @@ struct App {
         wchar_t path[32768];const DWORD n=GetModuleFileNameW(nullptr,path,32768);if(!n||n==32768) throw std::runtime_error("No se pudo localizar la aplicacion");
         // Support nested build directories and a future installed layout.
         root=std::filesystem::path(path).parent_path();
-        if(std::filesystem::exists(root/L"installed.marker")) {
-            const auto assets=root;PWSTR local=nullptr;
-            if(FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData,0,nullptr,&local)))
-                throw std::runtime_error("No se pudo localizar la carpeta de usuario");
-            root=dataRootOverride.empty()?std::filesystem::path(local)/L"RESONIQ":std::filesystem::absolute(dataRootOverride);CoTaskMemFree(local);
+        // A requested data directory wins wherever the application runs from.
+        // It used to be honoured only in the installed layout, so a build run
+        // for a test silently read and wrote the real profiles instead.
+        if(std::filesystem::exists(root/L"installed.marker")||!dataRootOverride.empty()) {
+            const auto assets=root;
+            if(dataRootOverride.empty()) {
+                PWSTR local=nullptr;
+                if(FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData,0,nullptr,&local)))
+                    throw std::runtime_error("No se pudo localizar la carpeta de usuario");
+                root=std::filesystem::path(local)/L"RESONIQ";CoTaskMemFree(local);
+            }else root=std::filesystem::absolute(dataRootOverride);
             std::filesystem::create_directories(root/L"config");
             std::filesystem::create_directories(root/L"profiles");
-            for(const auto& entry:std::filesystem::directory_iterator(assets/L"profiles"))
-                if(entry.is_regular_file()&&entry.path().extension()==L".dps")
-                    std::filesystem::copy_file(entry.path(),root/L"profiles"/entry.path().filename(),
-                                               std::filesystem::copy_options::skip_existing);
+            if(std::filesystem::is_directory(assets/L"profiles"))
+                for(const auto& entry:std::filesystem::directory_iterator(assets/L"profiles"))
+                    if(entry.is_regular_file()&&entry.path().extension()==L".dps")
+                        std::filesystem::copy_file(entry.path(),root/L"profiles"/entry.path().filename(),
+                                                   std::filesystem::copy_options::skip_existing);
         }
         for(auto candidate=root;!candidate.empty();) {
             if(std::filesystem::is_directory(candidate/L"profiles")&&std::filesystem::is_directory(candidate/L"config")) {
@@ -326,9 +335,8 @@ struct App {
         // user would see. The behaviour preferences stay out of the tests.
         loadPreferences();applyTheme();
         if(!selfTest&&!audioTest) {
-            // The registry is the real state for auto-start; the file only
-            // records what we last wrote.
-            prefs.startWithWindows=autoStartEnabled();
+            reconcileStartup();
+            prefs.startWithWindows=prefs.startWithWindows||autoStartEnabled();
             if(prefs.dspAtStart==1) profile.parameters.enabled=true;
             else if(prefs.dspAtStart==2) profile.parameters.enabled=false;
         }
@@ -631,9 +639,10 @@ struct App {
         add(WC_BUTTONW,L"",BS_OWNERDRAW,440,12,36,28,SetClose);
         add(WC_BUTTONW,L"Guardar",BS_OWNERDRAW|WS_TABSTOP,270,318,105,38,SetOk);
         add(WC_BUTTONW,L"Cancelar",BS_OWNERDRAW|WS_TABSTOP,385,318,105,38,SetCancel);
-        // Reflect the registry rather than the file: the entry may have been
-        // removed from the Windows startup settings behind our back.
-        CheckDlgButton(settings,SetStart,autoStartEnabled()?BST_CHECKED:BST_UNCHECKED);
+        // The saved request comes first: when Windows has dropped the
+        // registration the box must still show what the user asked for, or
+        // saving any other setting would silently cancel the auto-start.
+        CheckDlgButton(settings,SetStart,prefs.startWithWindows||autoStartEnabled()?BST_CHECKED:BST_UNCHECKED);
         CheckDlgButton(settings,SetMinimised,prefs.startMinimised?BST_CHECKED:BST_UNCHECKED);
         CheckDlgButton(settings,SetCloseExits,prefs.closeExits?BST_CHECKED:BST_UNCHECKED);
         CheckDlgButton(settings,SetReconnect,prefs.autoReconnect?BST_CHECKED:BST_UNCHECKED);
@@ -662,31 +671,78 @@ struct App {
             prefs={};startupWarning=L"Preferencias recuperadas; se conservan los archivos invalidos como copia.";
         }
     }
-    // Windows run key: per-user, no elevation needed.
-    static constexpr const wchar_t* runKey=L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+    static std::wstring executablePath() {
+        wchar_t path[32768];const DWORD n=GetModuleFileNameW(nullptr,path,32768);
+        if(!n||n==32768) throw std::runtime_error("No se pudo localizar la aplicacion");
+        return {path,n};
+    }
+    // What Windows should start: the installed application when there is one,
+    // so a build run from the source tree never takes sign-in over.
+    static std::wstring startupTarget() {return resoniq::startup::preferredCopy(executablePath());}
+    // Registered if either anchor names that copy: a missing Run value no
+    // longer means the user asked for no auto-start.
     bool autoStartEnabled() const {
-        HKEY key{};if(RegOpenKeyExW(HKEY_CURRENT_USER,runKey,0,KEY_READ,&key)!=ERROR_SUCCESS) return false;
-        const bool present=RegQueryValueExW(key,L"RESONIQ",nullptr,nullptr,nullptr,nullptr)==ERROR_SUCCESS;
-        RegCloseKey(key);return present;
+        const auto executable=startupTarget();
+        if(resoniq::startup::matches(executable)) return true;
+        try {
+            return resoniq::startup::sameText(resoniq::startup::registeredShortcut(resoniq::startup::startupFolder()),
+                                              resoniq::startup::command(executable));
+        }catch(const std::exception&) {return false;}
     }
     void applyAutoStart(bool enable) {
-        HKEY key{};
-        if(RegOpenKeyExW(HKEY_CURRENT_USER,runKey,0,KEY_SET_VALUE,&key)!=ERROR_SUCCESS)
-            throw std::runtime_error("No se pudo acceder al inicio de Windows");
-        LSTATUS result=ERROR_SUCCESS;
-        if(enable) {
-            wchar_t path[32768];const DWORD n=GetModuleFileNameW(nullptr,path,32768);
-            if(!n||n==32768) {RegCloseKey(key);throw std::runtime_error("No se pudo localizar la aplicacion");}
-            // Quoted so a path with spaces still starts, plus the tray flag.
-            const std::wstring command=L"\""+std::wstring(path)+L"\" --tray";
-            result=RegSetValueExW(key,L"RESONIQ",0,REG_SZ,reinterpret_cast<const BYTE*>(command.c_str()),
-                static_cast<DWORD>((command.size()+1)*sizeof(wchar_t)));
-        }else {
-            result=RegDeleteValueW(key,L"RESONIQ");
-            if(result==ERROR_FILE_NOT_FOUND) result=ERROR_SUCCESS;
-        }
-        RegCloseKey(key);
-        if(result!=ERROR_SUCCESS) throw std::runtime_error("No se pudo cambiar el inicio con Windows");
+        const auto executable=startupTarget();
+        resoniq::startup::apply(enable,executable);
+        resoniq::startup::applyShortcut(enable,executable,resoniq::startup::startupFolder());
+    }
+    // Windows has lost the Run value on at least one machine while the app was
+    // closed, which leaves no trace and no way back in by itself. Every start
+    // restores what the saved request asks for and writes down what it found,
+    // so a registration that keeps disappearing becomes visible.
+    void reconcileStartup() {
+        using resoniq::startup::Repair;
+        const auto describe=[](Repair outcome) {
+            switch(outcome) {
+            case Repair::Registered:return "restored";
+            case Repair::Retargeted:return "retargeted";
+            case Repair::Foreign:return "other_copy";
+            default:return "ok";
+            }
+        };
+        std::string audit="requested="+std::to_string(prefs.startWithWindows)+" by_windows="+std::to_string(startTray)+" ";
+        bool repaired=false,foreign=false;std::wstring failure;
+        const auto anchor=[&](const char* name,auto&& reconcile) {
+            try {
+                const auto outcome=reconcile();
+                audit+=std::string(name)+"="+describe(outcome)+" ";
+                repaired=repaired||outcome==Repair::Registered||outcome==Repair::Retargeted;
+                foreign=foreign||outcome==Repair::Foreign;
+            }catch(const std::exception& e) {
+                audit+=std::string(name)+"=failed ";
+                if(failure.empty()) failure=wide(e.what());
+            }
+        };
+        std::wstring executable;
+        try {executable=startupTarget();}
+        catch(const std::exception& e) {startupWarning=L"No se pudo asegurar el inicio con Windows: "+wide(e.what());return;}
+        anchor("run",[&]{return resoniq::startup::reconcile(prefs.startWithWindows,executable);});
+        anchor("shortcut",[&]{return resoniq::startup::reconcileShortcut(prefs.startWithWindows,executable,
+                                                                        resoniq::startup::startupFolder());});
+        if(!failure.empty()) {startupWarning=L"No se pudo asegurar el inicio con Windows: "+failure;audit+="detail="+utf8(failure);}
+        else if(repaired) startupWarning=L"Se ha reparado el inicio con Windows.";
+        else if(foreign) startupWarning=L"El inicio con Windows apunta a otra copia de RESONIQ.";
+        recordStartupAudit(audit);
+    }
+    void recordStartupAudit(const std::string& detail) {
+        try {
+            SYSTEMTIME now{};GetLocalTime(&now);
+            char stamp[32]{};
+            std::snprintf(stamp,sizeof(stamp),"%04u-%02u-%02u %02u:%02u:%02u ",static_cast<unsigned>(now.wYear),
+                static_cast<unsigned>(now.wMonth),static_cast<unsigned>(now.wDay),static_cast<unsigned>(now.wHour),
+                static_cast<unsigned>(now.wMinute),static_cast<unsigned>(now.wSecond));
+            std::filesystem::create_directories(root/L"build");
+            std::ofstream log(root/L"build/startup-audit.log",std::ios::app);
+            if(log) log<<stamp<<detail<<'\n';
+        }catch(const std::exception&) {}
     }
     // Pick a calibration from what the machine reports. Only touches the
     // device calibration: the listening controls stay as the user left them.
@@ -1589,6 +1645,22 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
     } graphicsRuntime;
     if(!graphicsRuntime.token) return 1;
     App app;int argc=0;auto argv=CommandLineToArgvW(GetCommandLineW(),&argc);if(argv) {for(int i=1;i<argc;++i) {if(std::wstring_view(argv[i])==L"--self-test") app.selfTest=true;else if(std::wstring_view(argv[i])==L"--audio-test") app.audioTest=true;else if(std::wstring_view(argv[i])==L"--profile"&&i+1<argc) app.requestedProfile=argv[++i];else if(std::wstring_view(argv[i])==L"--data-dir"&&i+1<argc) app.dataRootOverride=argv[++i];else if(std::wstring_view(argv[i])==L"--measurement-diagnostics") app.measurementDiagnostics=true;else if(std::wstring_view(argv[i])==L"--tray") app.startTray=true;}LocalFree(argv);}
+    // One copy at a time. Windows may now start the app from either anchor,
+    // and two engines on the same device would fight over it. Test runs keep
+    // their own data directory, so they stay free to run beside a live copy.
+    struct Single {HANDLE handle=nullptr;~Single(){if(handle) CloseHandle(handle);}} single;
+    if(!app.selfTest&&!app.audioTest&&app.dataRootOverride.empty()) {
+        single.handle=CreateMutexW(nullptr,TRUE,L"Local\\Resoniq.SingleInstance");
+        const bool taken=!single.handle||GetLastError()==ERROR_ALREADY_EXISTS;
+        if(taken) {
+            // Opened by hand while a copy is already running: show that one
+            // instead of a second window. A sign-in start stays quiet.
+            if(!app.startTray) if(HWND existing=FindWindowW(L"Resoniq.Gui",nullptr)) {
+                PostMessageW(existing,WM_COMMAND,TrayShow,0);SetForegroundWindow(existing);
+            }
+            return 0;
+        }
+    }
     WNDCLASSW wc{};wc.lpfnWndProc=procedure;wc.hInstance=instance;wc.lpszClassName=L"Resoniq.Gui";wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);wc.hIcon=LoadIconW(instance,MAKEINTRESOURCEW(1));RegisterClassW(&wc);
     // No system title bar and no resizing: the layout is fixed, and the close
     // and minimise buttons are drawn with the rest of the interface.

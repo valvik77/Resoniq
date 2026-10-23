@@ -27,6 +27,12 @@
         <Shortcut Id="RemoveDevice" Name="Retirar dispositivo virtual DSP" Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe" Arguments='-NoProfile -ExecutionPolicy Bypass -File "[INSTALLFOLDER]driver\Manage-Device.ps1" -Remove' WorkingDirectory="INSTALLFOLDER" />
         <RemoveFolder Id="RemoveStartMenu" On="uninstall" />
         <RegistryValue Root="HKLM" Key="Software\RESONIQ" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        <!-- Where the application lives, so it can register the installed
+             copy with Windows sign-in even when a build is run by hand. -->
+        <RegistryValue Root="HKLM" Key="Software\RESONIQ" Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" />
+        <!-- The sign-in registration is deliberately left to the application:
+             see the note in CableProduct.wxs. Removing it from the installer
+             would stop the app starting at sign-in after an update. -->
       </Component>
     </DirectoryRef>
     <CustomAction Id="InstallDevice" Directory="INSTALLFOLDER" ExeCommand='"[System64Folder]WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "[INSTALLFOLDER]driver\Manage-Device.ps1" -Install -NonInteractive' Execute="deferred" Impersonate="no" Return="check" />

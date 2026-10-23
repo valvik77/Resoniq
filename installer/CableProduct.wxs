@@ -1,5 +1,5 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package Name="RESONIQ" Manufacturer="Valvik" Version="0.2.15" UpgradeCode="B95F9C89-4D5B-4D1B-899B-65872A579D83" Scope="perMachine" Language="1034">
+  <Package Name="RESONIQ" Manufacturer="Valvik" Version="0.2.16" UpgradeCode="B95F9C89-4D5B-4D1B-899B-65872A579D83" Scope="perMachine" Language="1034">
     <Icon Id="ResoniqIcon" SourceFile="$(var.Payload)/resoniq.ico" />
     <Property Id="ARPPRODUCTICON" Value="ResoniqIcon" />
     <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="Ya hay una version mas reciente de RESONIQ instalada." />
@@ -43,6 +43,16 @@
       <Shortcut Id="Instructions" Name="RESONIQ - instrucciones" Target="[INSTALLFOLDER]VB-CABLE.txt" />
       <RemoveFolder Id="RemoveStartMenu" On="uninstall" />
       <RegistryValue Root="HKLM" Key="Software\RESONIQ" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+      <!-- Where the application lives, so it can register the installed
+           copy with Windows sign-in even when a build is run by hand. -->
+      <RegistryValue Root="HKLM" Key="Software\RESONIQ" Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" />
+      <!-- The sign-in registration is deliberately left to the application.
+           Cleaning it up from here cannot be made safe: removing it on install
+           deletes the registration of the copy being upgraded, and removing it
+           on uninstall also fires while a major upgrade takes the old product
+           out. Either way an update would silently stop the app from starting
+           at sign-in, which is the fault this is meant to prevent. An entry
+           left behind by an uninstall points nowhere and Windows ignores it. -->
     </Component></DirectoryRef>
   </Package>
 </Wix>

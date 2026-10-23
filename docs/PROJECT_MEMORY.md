@@ -1,5 +1,140 @@
 # Memoria del proyecto
 
+## Auditoría y doble anclaje de inicio — 23 de octubre de 2026, 0.2.16
+
+El fallo SIGUE VIGENTE y se reprodujo hoy: Windows reinició a las 17:20:58,
+sesión a las 17:21:21 y RESONIQ no arrancó. La entrada Run restaurada esta
+misma mañana a las 09:19 había desaparecido otra vez; la clave Run se escribió
+por última vez a las 17:36:49 con tres valores y ninguno RESONIQ. Descartados
+como causa: el instalador (no registra ni retira nada en Run), el código de la
+aplicación (ningún camino de salida borra el valor; el guardado de sesión de
+las 17:19:59 fue el cierre limpio del reinicio), Defender (sin detecciones de
+RESONIQ, solo eventos 5007 de configuración), StartupApproved (sin valor de
+bloqueo, cero valores) y limpiadores instalados (solo IObit Unlocker, que no
+gestiona el arranque). Quién lo borra sigue sin identificar: la marca de hora
+de la clave solo conserva la última escritura.
+
+Conclusión de diseño: un único anclaje que solo se repara cuando la aplicación
+arranca no puede recuperarse de un borrado ocurrido con la aplicación cerrada.
+Ahora se registran DOS anclajes independientes, la entrada Run y un acceso
+directo en la carpeta de Inicio, y los dos se comprueban y reponen en cada
+arranque. Cada arranque deja una línea en `build/startup-audit.log` con lo que
+encontró y si lo arrancó Windows, de modo que una pérdida futura quede fechada.
+La política de reparación está en una función pura con pruebas: repone si falta,
+reapunta si la ruta ya no existe o le falta `--tray`, no reescribe si ya está
+bien ni aunque cambie la caja de las letras, y respeta una entrada de otra copia
+que sigue en disco. El arranque se registra SIEMPRE para la copia instalada
+(valor nuevo InstallFolder en HKLM, o Program Files/RESONIQ): una compilación
+del árbol de fuentes ya no puede quedarse con el arranque de sesión.
+
+Otros defectos corregidos en la misma pasada: no había protección de instancia
+única, así que dos copias podían pelearse por el mismo dispositivo (ahora la
+segunda muestra la ventana de la primera y sale, salvo en pruebas); `--data-dir`
+se ignoraba si el ejecutable no tenía al lado installed.marker, de modo que una
+compilación de pruebas leía y escribía la configuración real (ya documentado
+como incidente el 14 de octubre y ahora arreglado); y la casilla de ajustes
+reflejaba el registro en vez de la preferencia guardada, por lo que guardar
+cualquier ajuste con la entrada perdida cancelaba el inicio automático en
+silencio. El desinstalador retira ahora los dos anclajes.
+
+Verificado en este equipo: 19/19 CTest, incluido el contrato de audio clásico
+y la prueba nueva de arranque; compilación Release/runtime estático sin avisos.
+La nueva compilación, ejecutada con configuración aislada y la preferencia
+activada, repuso los dos anclajes apuntando a `C:\Program Files\RESONIQ`,
+registró `run=restored shortcut=restored`, y en la segunda pasada `run=ok
+shortcut=ok` sin reescribir. Dos lanzamientos seguidos dejan un solo proceso.
+La aplicación instalada, lanzada con el mismo comando que usa el inicio de
+sesión, queda en bandeja sin ventana (PID 8728). Favorito, sesión y ajustes
+reales intactos: favorito SHA256 5119695B…C3E23E, sesión 02E32C0F…556F,
+ajustes 175A71EF…A1C1. Copia previa en build/startup-audit-20261023.
+
+ERROR PROPIO DETECTADO Y RETIRADO EN LA MISMA SESIÓN: se añadió al instalador
+la retirada de los dos anclajes al desinstalar. En WiX, `RemoveRegistryValue`
+sin más se aplica AL INSTALAR, de modo que la primera instalación de la 0.2.16
+borró la entrada Run del usuario; se vio en el registro inmediatamente después.
+Cambiarlo a «al desinstalar» tampoco sirve: esa retirada se ejecuta también
+cuando una actualización mayor desinstala el producto anterior, y dejaría la
+aplicación sin arrancar en sesión tras cada actualización. Decisión: el
+instalador NO toca el registro de inicio; solo lo gestiona la aplicación. Queda
+documentado en los dos .wxs. Una entrada huérfana tras desinstalar apunta a un
+archivo que ya no está y Windows la ignora, que es el mal menor.
+
+SALIDA DE AUDIO GUARDADA PERDIDA EN EL REINICIO, defecto distinto y vigente:
+la sesión guarda `output_id {0.0.0.00000000}.{6e5d6ebf-8251-48db-ba39-e13d55bf8d6a}`
+y ese endpoint ya NO existe en el equipo tras el reinicio de las 17:20; los
+Realtek presentes son {9e3be449…} activo y {d89d0664…} desconectado. Por eso la
+aplicación arranca, se queda en bandeja y NO procesa: telemetría running=0,
+finished=1, output_volume=-1, ninguna línea con running=1. No lo causó ningún
+cambio de esta sesión: el identificador cambió al reiniciar, probablemente por
+actualización del controlador. El comportamiento de esperar la salida guardada
+sin sustituirla por otro altavoz es DELIBERADO y está documentado en el README,
+así que no se cambió por iniciativa propia. Para volver a oír procesado hay que
+abrir RESONIQ y elegir la salida una vez; eso reescribirá la sesión, por lo que
+se deja a decisión del usuario. Pendiente de decidir: si la reconexión debe
+proponer la salida predeterminada del sistema cuando la guardada desaparece.
+
+Versión subida a 0.2.16 porque cambia el comportamiento del producto.
+MSI definitivo `dist/RESONIQ-Setup-0.2.16-x64-VBCABLE.msi`, ya sin la limpieza
+equivocada, SHA256
+871585537CD2A5169CE1170D9EB7C61BA7039365CDCF61A45BC48EA338BFD2B5;
+test_installer -Cable -SkipAudioTest pasa (evidencia
+build/installer-test-943e6bcbfdf24c43bb9ab787d9687b50). El hash
+E33FF254…E594 corresponde al intento con la limpieza y NO debe usarse.
+INSTALADA por autorización expresa del usuario: msiexec salida 0, exe en
+Program Files SHA256
+6B909B1D7C1078B0B49913FEE696DC61746C5AA3F4FAA909DC544F71ED7874AA, igual al
+compilado, 15 archivos, versión registrada en Windows 0.2.16, HKLM
+Software\RESONIQ InstallFolder `C:\Program Files\RESONIQ\`. Respaldo de la
+instalación anterior en build/install-0.2.16-backup y registros en
+build/install-0.2.16.log y build/install-0.2.16-corrected.log.
+La aplicación instalada repuso ella sola la entrada que faltaba
+(`run=restored shortcut=ok`), en el arranque siguiente no reescribió nada
+(`run=ok shortcut=ok`) y reinstalar encima conserva los dos anclajes.
+Proceso actual en bandeja desde Program Files.
+
+Al regenerar el instalador se sobrescribió
+`dist/RESONIQ-Setup-0.2.15-x64-VBCABLE.msi`: ese archivo ya NO es el MSI del 15
+de octubre con SHA256 A1A1424B…9459, que se reconstruye desde el commit e3b6af5
+si se necesita. No se reinició Windows ni se hizo push; el commit en main sí fue
+autorizado. No se tocó código de audio, perfiles ni volúmenes, y favorito,
+sesión y ajustes del usuario siguen con los hashes de arriba. La validación
+definitiva del inicio de sesión queda pendiente del próximo arranque real de
+Windows, y la escucha del usuario sigue pendiente como antes.
+
+## Corrección permanente de inicio automático — 23 de octubre de 2026
+
+Implementada por petición del usuario para la siguiente entrega. Al abrir
+normalmente la aplicación, conserva start_with_windows y repara la entrada
+Run si falta o apunta a otra ruta. No modifica StartupApproved (desactivación
+externa de Windows). Fallos de reparación se muestran mediante startupWarning.
+Guardar ajustes crea la clave si no existe y verifica el comando completo,
+con ruta entre comillas y --tray. Ya no basta la mera presencia de RESONIQ.
+Lógica en apps/windows_startup.hpp, integrada en gui_main.cpp. Prueba nueva
+usa una clave HKCU aislada: entrada ausente, preferencia desactivada, ruta
+obsoleta, reparación, comando correcto, idempotencia y eliminación.
+Build Release/runtime estático build/classic-ui-release completado sin avisos;
+19/19 CTest pasan, incluido contrato de audio clásico y controles GUI.
+Favorito repo conserva SHA256 5119695B…C3E23E. No se cambió código de audio.
+Ejecutable compilado: build/classic-ui-release/resoniq.exe. Sin generar MSI,
+instalar, reiniciar Windows, commit ni push; versión todavía 0.2.15.
+La aplicación instalada sigue siendo la anterior, con el registro reparado.
+Validación de arranque real pendiente del próximo inicio de sesión.
+
+## Reparación de inicio con Windows — 23 de octubre de 2026
+
+Usuario observa que no arranca pese a tener la opción marcada. Verificado:
+LocalAppData/config/settings.user.txt conserva start_with_windows 1, pero
+HKCU/Software/Microsoft/Windows/CurrentVersion/Run NO contenía RESONIQ.
+Restaurada entrada REG_SZ: `"C:\Program Files\RESONIQ\resoniq.exe" --tray`.
+Lectura posterior exacta; exe existe; sin valor RESONIQ de bloqueo en
+Explorer/StartupApproved/Run. No se conoce qué eliminó la entrada anterior.
+Backup Run y preferencias en build/startup-repair-20261023-091900.
+No se reinició Windows ni se simuló inicio lanzando una segunda instancia:
+la aplicación instalada sigue PID 25448. Validación real al próximo inicio
+de sesión pendiente. Sin cambios de código, audio, volúmenes ni perfiles.
+Favorito repo SHA256 5119695BA5D42074679AB8293F12FC44047126F19275C75DAEB57CEA82C3E23E.
+
+
 ## Instalador regenerado y entrega Git — 15 de octubre de 2026
 
 Petición: generar instalador, commit y push. Reconstruida la base actual 0.2.15

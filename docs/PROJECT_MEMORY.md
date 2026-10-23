@@ -26,12 +26,21 @@ el visto bueno va para la línea del volumen igualado y el perfil suave, no para
 el ajuste que ganaba por sonar más fuerte. Ver `docs/` y el histórico de
 comparación a igual volumen.
 
-RIESGO QUE HAY QUE RESOLVER: lo aprobado vive SOLO en la sesión, y la sesión se
-reescribe cada vez que se cierra la aplicación. Si el usuario mueve un control
-y cierra, ese punto se pierde. Se le ha preguntado si quiere conservarlo como
-favorito o como perfil aparte; NO se ha tocado ni el favorito ni los perfiles
-por iniciativa propia, porque igualar favorito y sesión sin permiso está
-expresamente prohibido en este proyecto.
+RIESGO RESUELTO: lo aprobado vivía SOLO en la sesión, que se reescribe cada vez
+que se cierra la aplicación. Preguntado qué hacer, el usuario eligió guardarlo
+como perfil aparte sin tocar nada más. Guardado en
+`%LOCALAPPDATA%/RESONIQ/config/Aprobado 2026-10-23 - suave.dps`, copia byte a
+byte de la sesión aprobada: mismo SHA256 C3BA7682…4070, 577 bytes. Está en
+`config` porque es la carpeta donde se abre el diálogo de Cargar; el arranque
+solo busca por nombre session/current/lenovo/favorite.user.dps, así que este
+archivo no altera ningún comportamiento automático.
+Validado de verdad, no solo copiado: `dps_wav` lo carga y procesa un tono de
+prueba de 1 s (48 kHz estéreo, 220 Hz + 3 kHz), 48000 cuadros, pico de entrada
+0,439423, pico de salida 0,891251, reducción máxima 5,0934 dB.
+El FAVORITO sigue intacto en 5119695B…C3E23E con los controles fuertes y los
+ajustes en 175A71EF…A1C1: no se igualó favorito y sesión, que está expresamente
+prohibido en este proyecto sin permiso. Si el usuario quiere más adelante que
+este punto sea el favorito, hay que pedírselo explícitamente otra vez.
 
 ## VALIDADO: arranca al iniciar sesión — 23 de octubre de 2026, noche
 

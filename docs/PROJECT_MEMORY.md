@@ -1,5 +1,35 @@
 # Memoria del proyecto
 
+## VALIDADO: arranca al iniciar sesión — 23 de octubre de 2026, noche
+
+El usuario reinició y confirma que el programa ya arranca al inicio. Medido, no
+supuesto: Windows arrancó a las 20:06:15 y el proceso de RESONIQ se creó a las
+20:07:06 desde Program Files, versión 0.2.17. El registro fechado dice
+`requested=1 by_windows=1 run=ok shortcut=ok`, es decir que lo lanzó Windows y
+que los DOS anclajes habían sobrevivido al reinicio intactos: no hubo nada que
+reparar. Ni un aviso en la telemetría. El audio entró a procesar en el segundo
+tic, a los 52,2 s del arranque de Windows, con DSP activo y volumen de salida
+leído 0.600074; no necesitó reintento de reconexión.
+
+La propuesta de salida cuajó: la sesión guarda ahora
+`output_id {0.0.0.00000000}.{9e3be449-851d-48f3-808e-9e1788a5afb4}`, el Realtek
+activo, y por eso `session.user.dps` pasó a SHA256
+C3BA7682CCEED41983627AB31F83F0F8FE82923B5D0AF7F1DC768457E8EE4070. Era la
+consecuencia prevista y solo ocurre una vez. El FAVORITO sigue intacto en
+5119695B…C3E23E y los ajustes en 175A71EF…A1C1.
+
+Notas de la release v0.2.17 actualizadas en GitHub: el aviso de «no comprobado
+con un inicio de sesión completo» se sustituyó por la comprobación real. Sigue
+dicho en público que el sonido de esta base no tiene valoración de escucha.
+
+OJO, lo que esto NO demuestra: que el borrado de la entrada no vuelva a pasar.
+Esta vez no hizo falta reparar nada, así que la autorreparación no se ejercitó
+en un inicio real; solo sabemos que el arranque funciona cuando los anclajes
+están. Quien siga esto: mirar `build/startup-audit.log` en los datos del
+usuario de vez en cuando. Si vuelve a aparecer `run=restored`, el borrador
+sigue ahí y ahora queda fechado. La causa del borrado continúa sin
+identificar.
+
 ## Salida propuesta cuando la guardada desaparece — 23 de octubre de 2026, 0.2.17
 
 Petición del usuario tras el informe: «sí, quiero que proponga la

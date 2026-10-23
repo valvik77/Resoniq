@@ -14,7 +14,7 @@ VB-CABLE o controlador propio, RESONIQ DSP Engine y salida física por WASAPI. E
 es ofrecer la mejora de altavoces de portátil que busca el usuario. El perfil
 Laptop Impact+ fue aprobado por escucha en el Lenovo Legion Pro 5 83LU.
 
-La versión local **0.2.16** reúne la interfaz actual y el audio de la **0.2.0
+La versión local **0.2.17** reúne la interfaz actual y el audio de la **0.2.0
 archivada**, recuperado por petición del usuario. Incluye iconos, temas
 claro/oscuro/sistema, Ajustes, inicio con Windows y minimizado, entrada virtual,
 lectura del volumen de Windows, versión visible y Acerca de. El motor, el búfer
@@ -47,8 +47,12 @@ independientes, la entrada Run del usuario y un acceso directo en la carpeta de
 Inicio, y la aplicación repone las que falten cada vez que arranca, dejando
 constancia en `build/startup-audit.log`. Siempre registra la copia instalada,
 nunca una compilación suelta, y no modifica la desactivación propia de Windows.
-Solo se ejecuta una copia a la vez: abrirla de nuevo muestra la que ya está. La reconexión espera a la salida guardada,
-sin sustituirla automáticamente por otro altavoz. Suspender Windows detiene
+Solo se ejecuta una copia a la vez: abrirla de nuevo muestra la que ya está.
+La reconexión espera a la salida guardada mientras Windows siga conociéndola,
+sin sustituirla por otro altavoz: unos auriculares desenchufados vuelven a su
+sitio y no suenan por los altavoces mientras tanto. Si Windows ya no conoce esa
+salida, porque ha sido reemplazada y no solo desconectada, la aplicación propone
+la predeterminada en vez de quedarse muda, y lo dice en la ventana. Suspender Windows detiene
 la ruta y reanudarla permite reconectar según preferencias. Un render sin
 progreso durante cinco segundos se considera detenido. No garantiza continuidad
 ni cambia la salida predeterminada de Windows.
@@ -144,7 +148,7 @@ El instalador publicado es `dist/RESONIQ-Setup-0.2.13-x64-VBCABLE.msi`, generado
 con `installer/Build-CableInstaller.ps1` y publicado como v0.2.13. Instala
 RESONIQ y añade un asistente «Instalar VB-CABLE» al menú Inicio; al finalizar
 ofrece abrirlo.
-El instalador local actual es `dist/RESONIQ-Setup-0.2.16-x64-VBCABLE.msi`,
+El instalador local actual es `dist/RESONIQ-Setup-0.2.17-x64-VBCABLE.msi`,
 generado y comprobado pero todavía sin instalar: en el equipo de desarrollo
 sigue instalada la 0.2.15. Sin publicar: interfaz actual
 con audio de la 0.2.0 archivada. La instalación conserva el controlador propio

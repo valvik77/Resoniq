@@ -1,5 +1,44 @@
 # Memoria del proyecto
 
+## Salida propuesta cuando la guardada desaparece — 23 de octubre de 2026, 0.2.17
+
+Petición del usuario tras el informe: «sí, quiero que proponga la
+predeterminada». Antes la reconexión esperaba indefinidamente a la salida
+guardada y la aplicación se quedaba muda. Cuidado importante: la predeterminada
+de Windows en este montaje es el CABLE, así que proponerla sin más crearía un
+bucle; la propuesta se hace solo entre las salidas FÍSICAS, es decir las que no
+son transporte virtual, y toma la predeterminada del sistema si está entre ellas
+o la primera disponible si no.
+
+Se conserva la regla original de no desviar el sonido a otro altavoz, ahora bien
+delimitada: se distingue una salida desenchufada de una reemplazada preguntando
+a Windows si todavía conoce ese endpoint en cualquier estado, porque la
+enumeración solo devuelve los activos. Desenchufada o deshabilitada sigue siendo
+conocida y se espera; olvidada por Windows se considera reemplazada y se propone
+la predeterminada. Si la consulta falla, se espera, que es lo prudente.
+Decisión en una función pura con pruebas; consulta nueva en la capa de audio,
+también probada contra un identificador inexistente y uno real del equipo.
+Al proponer, la ventana lo dice y queda en el registro de telemetría.
+
+Verificado en el caso real de este equipo (salida guardada
+{0.0.0.00000000}.{6e5d6ebf…} ya inexistente): con copia aislada de la
+configuración, la aplicación propuso «Altavoces (Realtek(R) Audio)» y el audio
+arrancó, running=1, finished=0, volumen leído 0.600074. 19/19 CTest, contrato
+de audio clásico incluido; compilación Release/runtime estático sin avisos.
+No se cambió el motor de audio ni los perfiles.
+
+Versión 0.2.17 e instalada por continuidad de la misma petición: msiexec salida
+0, MSI `dist/RESONIQ-Setup-0.2.17-x64-VBCABLE.msi` SHA256
+6D261D64905E4C5ADFD0A578DA2FB71AF6B1ECE33CD5781D699D0773B55B9823,
+test_installer -Cable -SkipAudioTest pasa (evidencia
+build/installer-test-5f8d3a97066b465f80c871be175d7cd6), exe instalado SHA256
+E0CDBE9F9FA49287359F7F163682CBA6246F2405EEEEE02F2F2946A210F185CA,
+registro build/install-0.2.17.log. Los dos anclajes de inicio siguen puestos.
+La aplicación instalada corre en bandeja procesando con la salida propuesta.
+CONSECUENCIA A VIGILAR: al cerrar, la sesión se guardará con la salida nueva,
+así que `session.user.dps` dejará de tener el hash 02E32C0F…556F. El favorito
+NO se toca y sigue en 5119695B…C3E23E. Sin reinicio de Windows y sin push.
+
 ## Auditoría y doble anclaje de inicio — 23 de octubre de 2026, 0.2.16
 
 El fallo SIGUE VIGENTE y se reprodujo hoy: Windows reinició a las 17:20:58,

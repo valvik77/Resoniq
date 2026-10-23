@@ -212,8 +212,24 @@ struct App {
         const int transport=dps::selectTransport(virtualInputs,wide(prefs.virtualInputId));
         SendMessageW(input,CB_SETCURSEL,transport,0);
         if(transport>=0) {virtualId=virtualInputs[transport].id;routed=virtualInputs[transport].defaultRender;}
-        const int choice=dps::selectOutput(physical,previous.empty()?wide(profile.outputId):previous);
+        const auto wanted=previous.empty()?wide(profile.outputId):previous;
+        const bool present=std::any_of(physical.begin(),physical.end(),[&](const auto& d){return d.id==wanted;});
+        // Keep waiting for a destination Windows still knows, however it is
+        // reported: only one it has forgotten counts as replaced. If the
+        // question cannot be answered, waiting stays the safer answer.
+        bool known=true;
+        if(!wanted.empty()&&!present)
+            try {known=dps::endpointKnown(wanted);}
+            catch(const std::exception&) {known=true;}
+        const int choice=dps::selectOutput(physical,wanted,known);
         SendMessageW(output,CB_SETCURSEL,choice,0);
+        if(!wanted.empty()&&!present&&!known&&choice>=0&&static_cast<std::size_t>(choice)<physical.size()) {
+            const auto note=L"La salida guardada ya no existe en este equipo; se propone "+physical[choice].name+L".";
+            startupWarning=startupWarning.empty()?note:startupWarning+L" "+note;
+            status=note;
+            if(telemetry) telemetry<<"output_proposed="<<utf8(physical[choice].name)
+                                   <<" saved_output="<<utf8(wanted)<<'\n';
+        }
         // The enumeration already read every endpoint's volume, so the new
         // selection starts from a real figure instead of a blank one.
         outputLevel=choice>=0&&static_cast<std::size_t>(choice)<physical.size()

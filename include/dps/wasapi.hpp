@@ -8,6 +8,11 @@
 namespace dps {
 struct Endpoint {std::wstring id,name;bool capture=false;float peak=0;bool defaultRender=false;float volume=-1;bool muted=false;std::wstring interfaceName;bool defaultCapture=false;};
 std::vector<Endpoint> endpoints();
+// Whether Windows still knows this endpoint at all, whatever its state. One
+// that is merely unplugged or disabled is still known; one that has been
+// replaced, as a driver update can do, is not. Enumeration only reports the
+// active ones, so this is what tells the two cases apart.
+bool endpointKnown(const std::wstring& id);
 // Control thread only. Explicit physical endpoint volume, in [0,1].
 void setEndpointVolume(const std::wstring& id,float volume);
 // Control-thread read for the Windows volume caption; does not set volume.

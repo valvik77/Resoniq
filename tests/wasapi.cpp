@@ -34,8 +34,17 @@ int main() {
         reject([]{(void)dps::captureMeasurement(L"missing",L"microphone",{2,2});});
         reject([]{(void)dps::captureMeasurement(L"missing",L"microphone",{.1f,.1f});});
         // Enumeration must still accept the caller's existing COM apartment.
-        (void)dps::endpoints();
-        std::cout<<"PASS: STA enumeration, invalid measurement signal and missing endpoint errors; no microphone opened\n";
+        const auto available=dps::endpoints();
+        // Telling an endpoint Windows has forgotten from one that is only
+        // unplugged decides whether a saved destination is waited for.
+        if(dps::endpointKnown(L"missing")) throw std::runtime_error("Unknown endpoint reported as known");
+        if(dps::endpointKnown(L"")) throw std::runtime_error("Empty endpoint reported as known");
+        for(const auto& endpoint:available) {
+            if(!dps::endpointKnown(endpoint.id)) throw std::runtime_error("Active endpoint reported as unknown");
+            break;
+        }
+        std::cout<<"PASS: STA enumeration, known and forgotten endpoints, invalid measurement signal "
+                   "and missing endpoint errors; no microphone opened\n";
     } catch(const std::exception& error) {std::cerr<<error.what()<<'\n';status=1;}
     CoUninitialize();return status;
 }

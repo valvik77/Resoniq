@@ -17,6 +17,16 @@ int main(){try {
     std::reverse(outputs.begin(),outputs.end());
     check(dps::selectOutput(outputs,L"headphones")==0,"Enumeration order changes destination");
     outputs.clear();check(dps::selectOutput(outputs,L"headphones")==-1,"Empty outputs accepted");
+    // Unplugged headphones are still known to Windows and must be waited for.
+    // A destination Windows has forgotten has been replaced, so a default is
+    // proposed rather than leaving the application silent for good.
+    std::vector<Endpoint> others{{L"speakers",false},{L"line-out",false}};
+    check(dps::selectOutput(others,L"headphones",true)==-1,"Unplugged headphones leak to another speaker");
+    check(dps::selectOutput(others,L"headphones",false)==0,"Replaced destination left the app silent");
+    others[1].defaultRender=true;
+    check(dps::selectOutput(others,L"headphones",false)==1,"Proposal ignores the Windows default");
+    check(dps::selectOutput(others,L"speakers",false)==0,"Available saved output not kept");
+    others.clear();check(dps::selectOutput(others,L"headphones",false)==-1,"Proposal invented an output");
     // The window reports the physical level, so a missing reading must not be
     // shown as silence and a muted endpoint must not look like a live one.
     check(dps::volumeCaption({})==L"Volumen de Windows sin dato","Unknown level reported as a figure");

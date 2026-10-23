@@ -100,6 +100,11 @@ std::vector<Endpoint> endpoints() {
         }
     }return result;
 }
+bool endpointKnown(const std::wstring& id) {
+    if(id.empty()) return false;
+    Com com;auto e=enumerator();ComPtr<IMMDevice> device;
+    return SUCCEEDED(e->GetDevice(id.c_str(),&device))&&device;
+}
 void setEndpointVolume(const std::wstring& id,float scalar) {
     if(!std::isfinite(scalar)||scalar<0||scalar>1) throw std::runtime_error("Output volume must be between 0 and 100 percent");
     Com com;auto e=enumerator();ComPtr<IMMDevice> device;require(e->GetDevice(id.c_str(),&device),"Volume endpoint");

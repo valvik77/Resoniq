@@ -37,7 +37,24 @@ registro build/install-0.2.17.log. Los dos anclajes de inicio siguen puestos.
 La aplicación instalada corre en bandeja procesando con la salida propuesta.
 CONSECUENCIA A VIGILAR: al cerrar, la sesión se guardará con la salida nueva,
 así que `session.user.dps` dejará de tener el hash 02E32C0F…556F. El favorito
-NO se toca y sigue en 5119695B…C3E23E. Sin reinicio de Windows y sin push.
+NO se toca y sigue en 5119695B…C3E23E. Sin reinicio de Windows.
+
+PUBLICADA por petición expresa del usuario («pero si puedes publicar release,
+no?» y elección de publicar ya). Push de los dos commits a main
+(e3b6af5..64ca13c) y release `v0.2.17` creada en
+https://github.com/valvik77/Resoniq/releases/tag/v0.2.17 con el MSI adjunto,
+no borrador y no prerelease; la anterior publicada era la v0.2.13 del 14 de
+octubre, así que las 0.2.14 a 0.2.16 siguen sin publicar y las notas lo dicen.
+Descarga pública comprobada: 1.609.728 bytes y SHA256 6D261D64…9823, idéntico
+al MSI local. Antes de publicar se revisó el MSI en busca de datos privados:
+no contiene identificadores de endpoint de este equipo, ni nombre de máquina,
+ni rutas de usuario, ni los archivos de configuración; las dos apariciones de
+«Valvik» son el fabricante declarado en el instalador. Las notas dicen
+explícitamente que el arranque NO está comprobado con un inicio de sesión
+completo y que el sonido de esta base sigue sin valoración de escucha, para no
+prometer en público lo que todavía no se ha verificado. `gh` ya estaba
+instalada (2.103.0) y autenticada como valvik77 con alcance repo; no se
+instaló nada nuevo ni se tocaron credenciales.
 
 ## Auditoría y doble anclaje de inicio — 23 de octubre de 2026, 0.2.16
 
